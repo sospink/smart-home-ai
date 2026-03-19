@@ -1,0 +1,398 @@
+app:
+  description: 家居控制子 Workflow（第一阶段 Mock，后续替换 HA API）
+  icon: "🏠"
+  icon_background: '#FEE2E2'
+  mode: workflow
+  name: 02 Home Control Workflow
+  use_icon_as_answer_icon: false
+dependencies: []
+kind: app
+version: 0.5.0
+workflow:
+  conversation_variables: []
+  environment_variables: []
+  features:
+    file_upload:
+      allowed_file_extensions:
+      - .TXT
+      allowed_file_types:
+      - document
+      allowed_file_upload_methods:
+      - local_file
+      enabled: false
+      fileUploadConfig:
+        audio_file_size_limit: 50
+        batch_count_limit: 5
+        file_size_limit: 15
+        image_file_batch_limit: 10
+        image_file_size_limit: 10
+        single_chunk_attachment_limit: 10
+        video_file_size_limit: 100
+        workflow_file_upload_limit: 10
+      image:
+        enabled: false
+        number_limits: 3
+        transfer_methods:
+        - local_file
+      number_limits: 3
+    opening_statement: ''
+    retriever_resource:
+      enabled: false
+    sensitive_word_avoidance:
+      enabled: false
+    speech_to_text:
+      enabled: false
+    suggested_questions: []
+    suggested_questions_after_answer:
+      enabled: false
+    text_to_speech:
+      enabled: false
+      language: ''
+      voice: ''
+  graph:
+    edges:
+    - data:
+        sourceType: start
+        targetType: llm
+      id: start-to-parse
+      source: start_node
+      sourceHandle: source
+      target: llm_parse
+      targetHandle: target
+      type: custom
+    - data:
+        sourceType: llm
+        targetType: llm
+      id: parse-to-strategy
+      source: llm_parse
+      sourceHandle: source
+      target: llm_strategy
+      targetHandle: target
+      type: custom
+    - data:
+        sourceType: llm
+        targetType: llm
+      id: strategy-to-mock
+      source: llm_strategy
+      sourceHandle: source
+      target: llm_mock_execute
+      targetHandle: target
+      type: custom
+    - data:
+        sourceType: llm
+        targetType: llm
+      id: mock-to-present
+      source: llm_mock_execute
+      sourceHandle: source
+      target: llm_present
+      targetHandle: target
+      type: custom
+    - data:
+        sourceType: llm
+        targetType: end
+      id: present-to-end
+      source: llm_present
+      sourceHandle: source
+      target: end_node
+      targetHandle: target
+      type: custom
+    nodes:
+    - data:
+        desc: 家居控制请求输入
+        selected: false
+        title: 开始
+        type: start
+        variables:
+        - label: user_id
+          hide: true
+          max_length: 128
+          options: []
+          required: false
+          type: text-input
+          variable: user_id
+        - label: session_id
+          hide: true
+          max_length: 128
+          options: []
+          required: false
+          type: text-input
+          variable: session_id
+        - label: query
+          max_length: 1000
+          options: []
+          required: true
+          type: text-input
+          variable: query
+        - label: context
+          hide: true
+          max_length: 2000
+          options: []
+          required: false
+          type: text-input
+          variable: context
+      height: 220
+      id: start_node
+      position:
+        x: 80
+        y: 300
+      positionAbsolute:
+        x: 80
+        y: 300
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+    - data:
+        context:
+          enabled: false
+        desc: 解析控制意图为结构化参数
+        memory:
+          role_prefix:
+            assistant: ''
+            user: ''
+          window:
+            enabled: false
+            size: 5
+        model:
+          completion_params:
+            max_tokens: 220
+            temperature: 0.1
+            top_p: 0.9
+          mode: chat
+          name: qwen3-max
+          provider: langgenius/tongyi/tongyi
+        prompt_template:
+        - id: parse-system
+          role: system
+          text: |
+            将控制请求解析为JSON（只输出JSON）：
+            {
+              "entity_id":"light.living_room",
+              "action":"turn_on|turn_off|set_temperature|set_brightness",
+              "value":0,
+              "reason":"..."
+            }
+        - id: parse-user
+          role: user
+          text: "{{#start_node.query#}}"
+        selected: false
+        title: 控制参数解析
+        type: llm
+        variables: []
+        vision:
+          enabled: false
+      height: 132
+      id: llm_parse
+      position:
+        x: 380
+        y: 300
+      positionAbsolute:
+        x: 380
+        y: 300
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+    - data:
+        context:
+          enabled: false
+        desc: 生成可执行策略与风控说明
+        memory:
+          role_prefix:
+            assistant: ''
+            user: ''
+          window:
+            enabled: false
+            size: 5
+        model:
+          completion_params:
+            max_tokens: 260
+            temperature: 0.1
+            top_p: 0.9
+          mode: chat
+          name: qwen3-max
+          provider: langgenius/tongyi/tongyi
+        prompt_template:
+        - id: strategy-system
+          role: system
+          text: |
+            你是控制策略节点。将解析结果转为执行计划JSON：
+            {
+              "intent":"device_control",
+              "execution_plan":{
+                "step_1":"参数校验",
+                "step_2":"目标设备确认",
+                "step_3":"执行控制"
+              },
+              "risk_level":"low|medium|high",
+              "risk_note":"..."
+            }
+            仅输出JSON。
+        - id: strategy-user
+          role: user
+          text: "{{#llm_parse.text#}}"
+        selected: false
+        title: 执行策略评估
+        type: llm
+        variables: []
+        vision:
+          enabled: false
+      height: 132
+      id: llm_strategy
+      position:
+        x: 680
+        y: 140
+      positionAbsolute:
+        x: 680
+        y: 140
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+    - data:
+        context:
+          enabled: false
+        desc: 控制执行 Mock（统一结构化输出）
+        memory:
+          role_prefix:
+            assistant: ''
+            user: ''
+          window:
+            enabled: false
+            size: 5
+        model:
+          completion_params:
+            max_tokens: 320
+            temperature: 0.1
+            top_p: 0.9
+          mode: chat
+          name: qwen3-max
+          provider: langgenius/tongyi/tongyi
+        prompt_template:
+        - id: mock-system
+          role: system
+          text: |
+            你是控制执行Mock节点。根据输入参数，输出JSON（不得输出其他文本）：
+            {
+              "status":"success",
+              "message":"home_control_mock_ok",
+              "payload":{
+                "intent":"...",
+                "parsed":{},
+                "execution":{
+                  "mode":"mock",
+                  "endpoint":"TODO_REAL_ENDPOINT",
+                  "note":"第二阶段替换为 Home Assistant API"
+                }
+              },
+              "trace_id":"..."
+            }
+        - id: mock-user
+          role: user
+          text: |
+            user_id={{#start_node.user_id#}}
+            session_id={{#start_node.session_id#}}
+            query={{#start_node.query#}}
+            parsed={{#llm_parse.text#}}
+            strategy={{#llm_strategy.text#}}
+        selected: false
+        title: 控制执行Mock
+        type: llm
+        variables: []
+        vision:
+          enabled: false
+      height: 132
+      id: llm_mock_execute
+      position:
+        x: 680
+        y: 300
+      positionAbsolute:
+        x: 680
+        y: 300
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+    - data:
+        context:
+          enabled: false
+        desc: 生成面向客户的控制反馈话术
+        memory:
+          role_prefix:
+            assistant: ''
+            user: ''
+          window:
+            enabled: false
+            size: 5
+        model:
+          completion_params:
+            max_tokens: 260
+            temperature: 0.2
+            top_p: 0.9
+          mode: chat
+          name: qwen3-max
+          provider: langgenius/tongyi/tongyi
+        prompt_template:
+        - id: present-system
+          role: system
+          text: |
+            你是“家居控制执行回执助手”。
+            把输入JSON转成简洁专业回复，包含：
+            1) 执行动作
+            2) 执行结果
+            3) 下一步建议
+            不要输出JSON。
+        - id: present-user
+          role: user
+          text: "{{#llm_mock_execute.text#}}"
+        selected: false
+        title: 客户可读回执
+        type: llm
+        variables: []
+        vision:
+          enabled: false
+      height: 132
+      id: llm_present
+      position:
+        x: 980
+        y: 300
+      positionAbsolute:
+        x: 980
+        y: 300
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+    - data:
+        desc: 控制结果输出
+        outputs:
+        - value_selector:
+          - llm_present
+          - text
+          variable: result
+        selected: false
+        title: 输出
+        type: end
+      height: 120
+      id: end_node
+      position:
+        x: 1280
+        y: 300
+      positionAbsolute:
+        x: 1280
+        y: 300
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+    viewport:
+      x: -60
+      y: -20
+      zoom: 0.9
+  rag_pipeline_variables: []

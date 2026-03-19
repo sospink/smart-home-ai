@@ -1,0 +1,28 @@
+# FastAPI core
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+python-multipart==0.0.20
+
+# Database
+sqlalchemy[asyncio]==2.0.36
+aiomysql==0.2.0
+alembic==1.14.1
+
+# Auth
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+
+# Config
+pydantic-settings==2.7.1
+
+# HTTP client (for HA / Dify)
+httpx==0.28.1
+
+# AI
+ollama==0.4.7
+
+# Time series
+influxdb-client[async]==1.48.0
+
+# Utils
+python-dotenv==1.0.1

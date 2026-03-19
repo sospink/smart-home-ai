@@ -1,0 +1,775 @@
+app:
+  description: 主 Chatflow（唯一对外入口），按意图路由到子 Workflow。
+  icon: 🤖
+  icon_background: '#DBEAFE'
+  mode: advanced-chat
+  name: 01 Main Orchestrator Chatflow
+  use_icon_as_answer_icon: true
+dependencies:
+- current_identifier: null
+  type: marketplace
+  value:
+    marketplace_plugin_unique_identifier: langgenius/tongyi:0.1.19@12ddda76bb473f9beb52d2ea2a67412d54924f93a29465fffb8635ba62b409c3
+    version: null
+kind: app
+version: 0.5.0
+workflow:
+  conversation_variables: []
+  environment_variables: []
+  features:
+    file_upload:
+      allowed_file_extensions:
+      - .PDF
+      - .MD
+      - .TXT
+      allowed_file_types:
+      - document
+      allowed_file_upload_methods:
+      - local_file
+      - remote_url
+      enabled: true
+      fileUploadConfig:
+        audio_file_size_limit: 50
+        batch_count_limit: 5
+        file_size_limit: 15
+        image_file_batch_limit: 10
+        image_file_size_limit: 10
+        single_chunk_attachment_limit: 10
+        video_file_size_limit: 100
+        workflow_file_upload_limit: 10
+      image:
+        enabled: false
+        number_limits: 3
+        transfer_methods:
+        - local_file
+        - remote_url
+      number_limits: 3
+    opening_statement: '你好，我是主调度智能体。
+
+      我会识别你的意图并路由到：家居控制 / 知识问答 / 数据分析。
+
+      '
+    retriever_resource:
+      enabled: false
+    sensitive_word_avoidance:
+      enabled: false
+    speech_to_text:
+      enabled: false
+    suggested_questions:
+    - 打开客厅灯
+    - 根据知识库回答这个问题：如何配置工作流
+    - 查询最近7天的设备调用趋势
+    suggested_questions_after_answer:
+      enabled: true
+    text_to_speech:
+      enabled: false
+      language: ''
+      voice: ''
+  graph:
+    edges:
+    - data:
+        sourceType: start
+        targetType: llm
+      id: start-to-enhance
+      source: start_node
+      sourceHandle: source
+      target: llm_query_enhance
+      targetHandle: target
+      type: custom
+    - data:
+        sourceType: llm
+        targetType: question-classifier
+      id: enhance-to-classifier
+      source: llm_query_enhance
+      sourceHandle: source
+      target: intent_classifier
+      targetHandle: target
+      type: custom
+    - data:
+        sourceType: question-classifier
+        targetType: http-request
+      id: cls-to-control
+      source: intent_classifier
+      sourceHandle: class_control
+      target: llm_control_dispatch
+      targetHandle: target
+      type: custom
+    - data:
+        sourceType: question-classifier
+        targetType: http-request
+      id: cls-to-rag
+      source: intent_classifier
+      sourceHandle: class_rag
+      target: llm_rag_dispatch
+      targetHandle: target
+      type: custom
+    - data:
+        sourceType: question-classifier
+        targetType: http-request
+      id: cls-to-data
+      source: intent_classifier
+      sourceHandle: class_data
+      target: llm_data_dispatch
+      targetHandle: target
+      type: custom
+    - data:
+        sourceType: question-classifier
+        targetType: llm
+      id: cls-to-general
+      source: intent_classifier
+      sourceHandle: class_general
+      target: llm_general
+      targetHandle: target
+      type: custom
+    - data:
+        sourceType: http-request
+        targetType: llm
+      id: control-to-answer
+      source: llm_control_dispatch
+      sourceHandle: source
+      target: llm_control_present
+      targetHandle: target
+      type: custom
+    - data:
+        sourceType: http-request
+        targetType: llm
+      id: rag-to-answer
+      source: llm_rag_dispatch
+      sourceHandle: source
+      target: llm_rag_present
+      targetHandle: target
+      type: custom
+    - data:
+        sourceType: http-request
+        targetType: llm
+      id: data-to-answer
+      source: llm_data_dispatch
+      sourceHandle: source
+      target: llm_data_present
+      targetHandle: target
+      type: custom
+    - data:
+        sourceType: llm
+        targetType: answer
+      id: control-present-to-answer
+      source: llm_control_present
+      sourceHandle: source
+      target: answer_control
+      targetHandle: target
+      type: custom
+    - data:
+        sourceType: llm
+        targetType: answer
+      id: rag-present-to-answer
+      source: llm_rag_present
+      sourceHandle: source
+      target: answer_rag
+      targetHandle: target
+      type: custom
+    - data:
+        sourceType: llm
+        targetType: answer
+      id: data-present-to-answer
+      source: llm_data_present
+      sourceHandle: source
+      target: answer_data
+      targetHandle: target
+      type: custom
+    - data:
+        sourceType: llm
+        targetType: answer
+      id: general-to-answer
+      source: llm_general
+      sourceHandle: source
+      target: answer_general
+      targetHandle: target
+      type: custom
+    nodes:
+    - data:
+        desc: 唯一入口，收敛会话上下文
+        selected: false
+        title: 开始
+        type: start
+        variables:
+        - hide: true
+          label: user_id
+          max_length: 128
+          options: []
+          required: false
+          type: text-input
+          variable: user_id
+        - hide: true
+          label: session_id
+          max_length: 128
+          options: []
+          required: false
+          type: text-input
+          variable: session_id
+        - hide: true
+          label: context
+          max_length: 2000
+          options: []
+          required: false
+          type: paragraph
+          variable: context
+      height: 189
+      id: start_node
+      position:
+        x: 80
+        y: 300
+      positionAbsolute:
+        x: 80
+        y: 300
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+    - data:
+        classes:
+        - id: class_control
+          name: 控制设备
+        - id: class_rag
+          name: 知识问答
+        - id: class_data
+          name: 数据查询
+        - id: class_general
+          name: 其他问题
+        desc: 主 Chatflow 意图路由（多 Agent 分层设计核心）
+        instructions: '分类规则：
+
+          1) 控制设备：开关、调温、执行动作类请求。示例：打开客厅灯、关闭卧室空调。
+
+          2) 知识问答：文档、说明、FAQ、概念解释。示例：如何配置工作流、系统支持什么能力。
+
+          3) 数据查询：趋势、统计、历史、报表分析。示例：最近7天趋势、本周设备调用统计。
+
+          4) 其余归到其他问题。
+
+          优先级：若出现明确控制动词（打开/关闭/调高/调低/设置）优先判为“控制设备”。
+
+          '
+        model:
+          completion_params:
+            frequency_penalty: 0
+            max_tokens: 128
+            presence_penalty: 0
+            temperature: 0
+            top_p: 0.9
+          mode: chat
+          name: qwen3-max
+          provider: langgenius/tongyi/tongyi
+        query_variable_selector:
+        - llm_query_enhance
+        - text
+        selected: false
+        title: 意图分类器
+        topics: []
+        type: question-classifier
+        vision:
+          enabled: false
+      height: 290
+      id: intent_classifier
+      position:
+        x: 380
+        y: 250
+      positionAbsolute:
+        x: 380
+        y: 250
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+    - data:
+        context:
+          enabled: false
+        desc: 对用户问题做规范化与任务标签增强
+        memory:
+          role_prefix:
+            assistant: ''
+            user: ''
+          window:
+            enabled: false
+            size: 5
+        model:
+          completion_params:
+            max_tokens: 180
+            temperature: 0
+            top_p: 0.9
+          mode: chat
+          name: qwen3-max
+          provider: langgenius/tongyi/tongyi
+        prompt_template:
+        - id: enhance-system
+          role: system
+          text: '你是“请求增强器”。
+
+            将用户原始输入转成更清晰的单句任务描述，补充必要上下文关键词。
+
+            只输出增强后的文本，不要JSON。
+
+            '
+        - id: enhance-user
+          role: user
+          text: '{{#sys.query#}}'
+        selected: false
+        title: 查询增强
+        type: llm
+        variables: []
+        vision:
+          enabled: false
+      height: 116
+      id: llm_query_enhance
+      position:
+        x: 380
+        y: 80
+      positionAbsolute:
+        x: 380
+        y: 80
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+    - data:
+        authorization:
+          config: null
+          type: no-auth
+        body:
+          data:
+          - id: key-value-control
+            key: ''
+            type: text
+            value: '{"inputs":{"user_id":"{{#start_node.user_id#}}","session_id":"{{#start_node.session_id#}}","query":"{{#sys.query#}}","context":"{{#start_node.context#}}"},"response_mode":"blocking","user":"orchestrator-main"}'
+          type: raw-text
+        desc: 自动调用 02_home_control_workflow
+        headers: 'Authorization:Bearer app-Tk0exFJfo1mlRbFOqbVvd9oU
+
+          Content-Type:application/json'
+        method: post
+        params: ''
+        retry_config:
+          max_retries: 0
+          retry_enabled: false
+          retry_interval: 100
+        selected: false
+        ssl_verify: true
+        timeout:
+          max_connect_timeout: 0
+          max_read_timeout: 0
+          max_write_timeout: 0
+        title: 调用控制子流程
+        type: http-request
+        url: http://117.50.80.138/v1/workflows/run
+        variables: []
+      height: 136
+      id: llm_control_dispatch
+      position:
+        x: 730
+        y: 120
+      positionAbsolute:
+        x: 730
+        y: 120
+      selected: true
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+    - data:
+        authorization:
+          config: null
+          type: no-auth
+        body:
+          data:
+          - id: key-value-rag
+            key: ''
+            type: text
+            value: '{"inputs":{"user_id":"{{#start_node.user_id#}}","session_id":"{{#start_node.session_id#}}","query":"{{#sys.query#}}","context":"{{#start_node.context#}}"},"response_mode":"blocking","user":"orchestrator-main"}'
+          type: raw-text
+        desc: 自动调用 03_rag_qa_workflow
+        headers: 'Authorization:Bearer app-1xTVEvyKqPjHujSxNoZXUvJ1
+
+          Content-Type:application/json'
+        method: post
+        params: ''
+        retry_config:
+          max_retries: 0
+          retry_enabled: false
+          retry_interval: 100
+        selected: false
+        ssl_verify: true
+        timeout:
+          max_connect_timeout: 0
+          max_read_timeout: 0
+          max_write_timeout: 0
+        title: 调用RAG子流程
+        type: http-request
+        url: http://117.50.80.138/v1/workflows/run
+        variables: []
+      height: 136
+      id: llm_rag_dispatch
+      position:
+        x: 730
+        y: 280
+      positionAbsolute:
+        x: 730
+        y: 280
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+    - data:
+        authorization:
+          config: null
+          type: no-auth
+        body:
+          data:
+          - id: key-value-data
+            key: ''
+            type: text
+            value: '{"inputs":{"user_id":"{{#start_node.user_id#}}","session_id":"{{#start_node.session_id#}}","query":"{{#sys.query#}}","context":"{{#start_node.context#}}"},"response_mode":"blocking","user":"orchestrator-main"}'
+          type: raw-text
+        desc: 自动调用 04_data_analysis_workflow
+        headers: 'Authorization:Bearer app-79YgYlTDQ5VjuLjKPdMv1ElH
+
+          Content-Type:application/json'
+        method: post
+        params: ''
+        retry_config:
+          max_retries: 0
+          retry_enabled: false
+          retry_interval: 100
+        selected: false
+        ssl_verify: true
+        timeout:
+          max_connect_timeout: 0
+          max_read_timeout: 0
+          max_write_timeout: 0
+        title: 调用数据子流程
+        type: http-request
+        url: http://117.50.80.138/v1/workflows/run
+        variables: []
+      height: 136
+      id: llm_data_dispatch
+      position:
+        x: 730
+        y: 440
+      positionAbsolute:
+        x: 730
+        y: 440
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+    - data:
+        context:
+          enabled: false
+        desc: 将控制子流程API响应转换为用户可读文本
+        memory:
+          role_prefix:
+            assistant: ''
+            user: ''
+          window:
+            enabled: false
+            size: 5
+        model:
+          completion_params:
+            max_tokens: 120
+            temperature: 0
+            top_p: 0.9
+          mode: chat
+          name: qwen3-max
+          provider: langgenius/tongyi/tongyi
+        prompt_template:
+        - id: control-present-system
+          role: system
+          text: '你是“响应清洗器”。
+
+            输入是 /v1/workflows/run 的JSON响应字符串。
+
+            只输出给最终用户的一段简短中文文本，不要JSON、不要代码块、不要解释。
+
+            优先输出 data.outputs.result 的内容；若没有则输出“已执行控制流程，但未返回可读结果”。
+
+            '
+        - id: control-present-user
+          role: user
+          text: '{{#llm_control_dispatch.body#}}'
+        selected: false
+        title: 控制结果整理
+        type: llm
+        variables: []
+        vision:
+          enabled: false
+      height: 132
+      id: llm_control_present
+      position:
+        x: 1030
+        y: 120
+      positionAbsolute:
+        x: 1030
+        y: 120
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+    - data:
+        context:
+          enabled: false
+        desc: 将RAG子流程API响应转换为用户可读文本
+        memory:
+          role_prefix:
+            assistant: ''
+            user: ''
+          window:
+            enabled: false
+            size: 5
+        model:
+          completion_params:
+            max_tokens: 120
+            temperature: 0
+            top_p: 0.9
+          mode: chat
+          name: qwen3-max
+          provider: langgenius/tongyi/tongyi
+        prompt_template:
+        - id: rag-present-system
+          role: system
+          text: '你是“响应清洗器”。
+
+            输入是 /v1/workflows/run 的JSON响应字符串。
+
+            只输出给最终用户的一段简短中文文本，不要JSON、不要代码块、不要解释。
+
+            优先输出 data.outputs.result 的内容；若没有则输出“已执行知识问答流程，但未返回可读结果”。
+
+            '
+        - id: rag-present-user
+          role: user
+          text: '{{#llm_rag_dispatch.body#}}'
+        selected: false
+        title: RAG结果整理
+        type: llm
+        variables: []
+        vision:
+          enabled: false
+      height: 132
+      id: llm_rag_present
+      position:
+        x: 1030
+        y: 280
+      positionAbsolute:
+        x: 1030
+        y: 280
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+    - data:
+        context:
+          enabled: false
+        desc: 将数据子流程API响应转换为用户可读文本
+        memory:
+          role_prefix:
+            assistant: ''
+            user: ''
+          window:
+            enabled: false
+            size: 5
+        model:
+          completion_params:
+            max_tokens: 120
+            temperature: 0
+            top_p: 0.9
+          mode: chat
+          name: qwen3-max
+          provider: langgenius/tongyi/tongyi
+        prompt_template:
+        - id: data-present-system
+          role: system
+          text: '你是“响应清洗器”。
+
+            输入是 /v1/workflows/run 的JSON响应字符串。
+
+            只输出给最终用户的一段简短中文文本，不要JSON、不要代码块、不要解释。
+
+            优先输出 data.outputs.result 的内容；若没有则输出“已执行数据分析流程，但未返回可读结果”。
+
+            '
+        - id: data-present-user
+          role: user
+          text: '{{#llm_data_dispatch.body#}}'
+        selected: false
+        title: 数据结果整理
+        type: llm
+        variables: []
+        vision:
+          enabled: false
+      height: 132
+      id: llm_data_present
+      position:
+        x: 1030
+        y: 440
+      positionAbsolute:
+        x: 1030
+        y: 440
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+    - data:
+        context:
+          enabled: false
+        desc: 兜底回答
+        memory:
+          role_prefix:
+            assistant: ''
+            user: ''
+          window:
+            enabled: true
+            size: 10
+        model:
+          completion_params:
+            max_tokens: 768
+            temperature: 0.5
+            top_p: 0.9
+          mode: chat
+          name: qwen3-max
+          provider: langgenius/tongyi/tongyi
+        prompt_template:
+        - id: general-system
+          role: system
+          text: '你是主入口兜底助手。优先提示用户使用三类能力：控制设备、知识问答、数据查询。
+
+            输出JSON：status,message,payload,trace_id。
+
+            '
+        - id: general-user
+          role: user
+          text: '{{#sys.query#}}'
+        selected: false
+        title: 兜底回答
+        type: llm
+        variables: []
+        vision:
+          enabled: false
+      height: 116
+      id: llm_general
+      position:
+        x: 730
+        y: 600
+      positionAbsolute:
+        x: 730
+        y: 600
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+    - data:
+        answer: '{{#llm_control_present.text#}}'
+        desc: 控制子流程返回
+        selected: false
+        title: 控制输出
+        type: answer
+        variables:
+        - value_selector:
+          - llm_control_present
+          - text
+          variable: text
+      height: 131
+      id: answer_control
+      position:
+        x: 1330
+        y: 120
+      positionAbsolute:
+        x: 1330
+        y: 120
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+    - data:
+        answer: '{{#llm_rag_present.text#}}'
+        desc: RAG子流程返回
+        selected: false
+        title: RAG输出
+        type: answer
+        variables:
+        - value_selector:
+          - llm_rag_present
+          - text
+          variable: text
+      height: 131
+      id: answer_rag
+      position:
+        x: 1330
+        y: 280
+      positionAbsolute:
+        x: 1330
+        y: 280
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+    - data:
+        answer: '{{#llm_data_present.text#}}'
+        desc: 数据子流程返回
+        selected: false
+        title: 数据输出
+        type: answer
+        variables:
+        - value_selector:
+          - llm_data_present
+          - text
+          variable: text
+      height: 131
+      id: answer_data
+      position:
+        x: 1330
+        y: 440
+      positionAbsolute:
+        x: 1330
+        y: 440
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+    - data:
+        answer: '{{#llm_general.text#}}'
+        desc: 兜底输出
+        selected: false
+        title: 兜底输出
+        type: answer
+        variables:
+        - value_selector:
+          - llm_general
+          - text
+          variable: text
+      height: 131
+      id: answer_general
+      position:
+        x: 1050
+        y: 600
+      positionAbsolute:
+        x: 1050
+        y: 600
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+    viewport:
+      x: -256.4765377820095
+      y: -54.357260242954
+      zoom: 0.895023151805897
+  rag_pipeline_variables: []

@@ -1,0 +1,500 @@
+app:
+  description: 知识问答子 Workflow（RAG）
+  icon: "📚"
+  icon_background: '#DCFCE7'
+  mode: workflow
+  name: 03 RAG QA Workflow
+  use_icon_as_answer_icon: false
+dependencies: []
+kind: app
+version: 0.5.0
+workflow:
+  conversation_variables: []
+  environment_variables: []
+  features:
+    file_upload:
+      allowed_file_extensions:
+      - .PDF
+      - .MD
+      - .TXT
+      allowed_file_types:
+      - document
+      allowed_file_upload_methods:
+      - local_file
+      - remote_url
+      enabled: true
+      fileUploadConfig:
+        audio_file_size_limit: 50
+        batch_count_limit: 5
+        file_size_limit: 15
+        image_file_batch_limit: 10
+        image_file_size_limit: 10
+        single_chunk_attachment_limit: 10
+        video_file_size_limit: 100
+        workflow_file_upload_limit: 10
+      image:
+        enabled: false
+        number_limits: 3
+        transfer_methods:
+        - local_file
+        - remote_url
+      number_limits: 3
+    opening_statement: ''
+    retriever_resource:
+      enabled: false
+    sensitive_word_avoidance:
+      enabled: false
+    speech_to_text:
+      enabled: false
+    suggested_questions: []
+    suggested_questions_after_answer:
+      enabled: false
+    text_to_speech:
+      enabled: false
+      language: ''
+      voice: ''
+  graph:
+    edges:
+    - data:
+        sourceType: start
+        targetType: knowledge-retrieval
+      id: start-to-kb
+      source: start_node
+      sourceHandle: source
+      target: kb_node
+      targetHandle: target
+      type: custom
+    - data:
+        sourceType: knowledge-retrieval
+        targetType: if-else
+      id: kb-to-if
+      source: kb_node
+      sourceHandle: source
+      target: if_has_context
+      targetHandle: target
+      type: custom
+    - data:
+        sourceType: if-else
+        targetType: llm
+      id: if-true-to-hit
+      source: if_has_context
+      sourceHandle: 'true'
+      target: llm_hit
+      targetHandle: target
+      type: custom
+    - data:
+        sourceType: if-else
+        targetType: llm
+      id: if-false-to-miss
+      source: if_has_context
+      sourceHandle: 'false'
+      target: llm_miss
+      targetHandle: target
+      type: custom
+    - data:
+        sourceType: llm
+        targetType: llm
+      id: hit-to-polish
+      source: llm_hit
+      sourceHandle: source
+      target: llm_hit_polish
+      targetHandle: target
+      type: custom
+    - data:
+        sourceType: llm
+        targetType: llm
+      id: miss-to-polish
+      source: llm_miss
+      sourceHandle: source
+      target: llm_miss_polish
+      targetHandle: target
+      type: custom
+    - data:
+        sourceType: llm
+        targetType: end
+      id: polish-hit-to-end
+      source: llm_hit_polish
+      sourceHandle: source
+      target: end_hit
+      targetHandle: target
+      type: custom
+    - data:
+        sourceType: llm
+        targetType: end
+      id: polish-miss-to-end
+      source: llm_miss_polish
+      sourceHandle: source
+      target: end_miss
+      targetHandle: target
+      type: custom
+    nodes:
+    - data:
+        desc: RAG 查询输入
+        selected: false
+        title: 开始
+        type: start
+        variables:
+        - label: user_id
+          hide: true
+          max_length: 128
+          options: []
+          required: false
+          type: text-input
+          variable: user_id
+        - label: session_id
+          hide: true
+          max_length: 128
+          options: []
+          required: false
+          type: text-input
+          variable: session_id
+        - label: query
+          max_length: 1000
+          options: []
+          required: true
+          type: text-input
+          variable: query
+        - label: context
+          hide: true
+          max_length: 2000
+          options: []
+          required: false
+          type: text-input
+          variable: context
+      height: 220
+      id: start_node
+      position:
+        x: 80
+        y: 300
+      positionAbsolute:
+        x: 80
+        y: 300
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+    - data:
+        dataset_ids: []
+        desc: 知识库检索（导入后手动绑定 dataset）
+        multiple_retrieval_config:
+          reranking_enable: false
+          reranking_mode: reranking_model
+          reranking_model:
+            model: gte-rerank
+            provider: langgenius/tongyi/tongyi
+          score_threshold: null
+          top_k: 3
+        query_attachment_selector: []
+        query_variable_selector:
+        - start_node
+        - query
+        retrieval_mode: multiple
+        selected: false
+        single_retrieval_config:
+          model:
+            completion_params: {}
+            mode: chat
+            name: qwen3-max
+            provider: langgenius/tongyi/tongyi
+        title: 知识库检索
+        type: knowledge-retrieval
+      height: 134
+      id: kb_node
+      position:
+        x: 380
+        y: 300
+      positionAbsolute:
+        x: 380
+        y: 300
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+    - data:
+        conditions:
+        - comparison_operator: not empty
+          id: cond_has_context
+          value: __non_empty_placeholder__
+          varType: string
+          variable_selector:
+          - kb_node
+          - result
+        desc: 判断是否命中知识库
+        logical_operator: and
+        selected: false
+        title: 是否命中
+        type: if-else
+      height: 154
+      id: if_has_context
+      position:
+        x: 680
+        y: 300
+      positionAbsolute:
+        x: 680
+        y: 300
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+    - data:
+        context:
+          enabled: true
+          variable_selector:
+          - kb_node
+          - result
+        desc: 命中知识库回答
+        memory:
+          role_prefix:
+            assistant: ''
+            user: ''
+          window:
+            enabled: false
+            size: 5
+        model:
+          completion_params:
+            max_tokens: 384
+            temperature: 0.2
+            top_p: 0.9
+          mode: chat
+          name: qwen3-max
+          provider: langgenius/tongyi/tongyi
+        prompt_template:
+        - id: rag-hit-system
+          role: system
+          text: |
+            你是RAG回答节点。输出JSON：
+            {
+              "status":"success",
+              "message":"rag_hit",
+              "payload":{"answer":"...","citations":"..."},
+              "trace_id":"..."
+            }
+        - id: rag-hit-user
+          role: user
+          text: |
+            问题：{{#start_node.query#}}
+            上下文：{{#kb_node.result#}}
+        selected: false
+        title: 命中回答
+        type: llm
+        variables: []
+        vision:
+          enabled: false
+      height: 132
+      id: llm_hit
+      position:
+        x: 980
+        y: 220
+      positionAbsolute:
+        x: 980
+        y: 220
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+    - data:
+        context:
+          enabled: false
+        desc: 未命中降级回答
+        memory:
+          role_prefix:
+            assistant: ''
+            user: ''
+          window:
+            enabled: false
+            size: 5
+        model:
+          completion_params:
+            max_tokens: 160
+            temperature: 0.2
+            top_p: 0.9
+          mode: chat
+          name: qwen3-max
+          provider: langgenius/tongyi/tongyi
+        prompt_template:
+        - id: rag-miss-system
+          role: system
+          text: |
+            输出JSON：
+            {
+              "status":"success",
+              "message":"knowledge_not_found",
+              "payload":{"answer":"当前知识库未命中，请补充文档后重试。"},
+              "trace_id":"..."
+            }
+        - id: rag-miss-user
+          role: user
+          text: "{{#start_node.query#}}"
+        selected: false
+        title: 未命中回答
+        type: llm
+        variables: []
+        vision:
+          enabled: false
+      height: 132
+      id: llm_miss
+      position:
+        x: 980
+        y: 390
+      positionAbsolute:
+        x: 980
+        y: 390
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+    - data:
+        context:
+          enabled: false
+        desc: 命中答案润色与引用格式化
+        memory:
+          role_prefix:
+            assistant: ''
+            user: ''
+          window:
+            enabled: false
+            size: 5
+        model:
+          completion_params:
+            max_tokens: 260
+            temperature: 0.2
+            top_p: 0.9
+          mode: chat
+          name: qwen3-max
+          provider: langgenius/tongyi/tongyi
+        prompt_template:
+        - id: hit-polish-system
+          role: system
+          text: |
+            你是RAG答案编辑器。
+            将输入内容整理成更专业的中文输出，结构为：
+            - 结论
+            - 依据（可引用）
+            - 建议下一步
+            禁止输出JSON。
+        - id: hit-polish-user
+          role: user
+          text: "{{#llm_hit.text#}}"
+        selected: false
+        title: 命中结果优化
+        type: llm
+        variables: []
+        vision:
+          enabled: false
+      height: 132
+      id: llm_hit_polish
+      position:
+        x: 1280
+        y: 220
+      positionAbsolute:
+        x: 1280
+        y: 220
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+    - data:
+        context:
+          enabled: false
+        desc: 未命中情况下生成补齐建议
+        memory:
+          role_prefix:
+            assistant: ''
+            user: ''
+          window:
+            enabled: false
+            size: 5
+        model:
+          completion_params:
+            max_tokens: 200
+            temperature: 0.2
+            top_p: 0.9
+          mode: chat
+          name: qwen3-max
+          provider: langgenius/tongyi/tongyi
+        prompt_template:
+        - id: miss-polish-system
+          role: system
+          text: |
+            你是知识库运维助手。
+            在未命中时，输出简洁说明并附上3条可执行补库建议。
+            禁止输出JSON。
+        - id: miss-polish-user
+          role: user
+          text: "{{#llm_miss.text#}}"
+        selected: false
+        title: 未命中补库建议
+        type: llm
+        variables: []
+        vision:
+          enabled: false
+      height: 132
+      id: llm_miss_polish
+      position:
+        x: 1280
+        y: 390
+      positionAbsolute:
+        x: 1280
+        y: 390
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+    - data:
+        desc: 命中结果
+        outputs:
+        - value_selector:
+          - llm_hit_polish
+          - text
+          variable: result
+        selected: false
+        title: 命中输出
+        type: end
+      height: 100
+      id: end_hit
+      position:
+        x: 1580
+        y: 220
+      positionAbsolute:
+        x: 1580
+        y: 220
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+    - data:
+        desc: 未命中结果
+        outputs:
+        - value_selector:
+          - llm_miss_polish
+          - text
+          variable: result
+        selected: false
+        title: 未命中输出
+        type: end
+      height: 100
+      id: end_miss
+      position:
+        x: 1580
+        y: 390
+      positionAbsolute:
+        x: 1580
+        y: 390
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+    viewport:
+      x: -80
+      y: -30
+      zoom: 0.9
+  rag_pipeline_variables: []

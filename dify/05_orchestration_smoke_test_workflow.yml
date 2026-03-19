@@ -1,0 +1,305 @@
+app:
+  description: 多 Agent 分层架构联调验证 Workflow（无 code 节点）
+  icon: "🧰"
+  icon_background: '#E5E7EB'
+  mode: workflow
+  name: 05 Orchestration Smoke Test Workflow
+  use_icon_as_answer_icon: false
+dependencies: []
+kind: app
+version: 0.5.0
+workflow:
+  conversation_variables: []
+  environment_variables: []
+  features:
+    file_upload:
+      allowed_file_extensions:
+      - .TXT
+      allowed_file_types:
+      - document
+      allowed_file_upload_methods:
+      - local_file
+      enabled: false
+      fileUploadConfig:
+        audio_file_size_limit: 50
+        batch_count_limit: 5
+        file_size_limit: 15
+        image_file_batch_limit: 10
+        image_file_size_limit: 10
+        single_chunk_attachment_limit: 10
+        video_file_size_limit: 100
+        workflow_file_upload_limit: 10
+      image:
+        enabled: false
+        number_limits: 3
+        transfer_methods:
+        - local_file
+      number_limits: 3
+    opening_statement: ''
+    retriever_resource:
+      enabled: false
+    sensitive_word_avoidance:
+      enabled: false
+    speech_to_text:
+      enabled: false
+    suggested_questions: []
+    suggested_questions_after_answer:
+      enabled: false
+    text_to_speech:
+      enabled: false
+      language: ''
+      voice: ''
+  graph:
+    edges:
+    - data:
+        sourceType: start
+        targetType: llm
+      id: start-to-casegen
+      source: start_node
+      sourceHandle: source
+      target: llm_case_gen
+      targetHandle: target
+      type: custom
+    - data:
+        sourceType: llm
+        targetType: llm
+      id: casegen-to-check
+      source: llm_case_gen
+      sourceHandle: source
+      target: llm_check
+      targetHandle: target
+      type: custom
+    - data:
+        sourceType: llm
+        targetType: llm
+      id: check-to-score
+      source: llm_check
+      sourceHandle: source
+      target: llm_score
+      targetHandle: target
+      type: custom
+    - data:
+        sourceType: llm
+        targetType: end
+      id: score-to-end
+      source: llm_score
+      sourceHandle: source
+      target: end_node
+      targetHandle: target
+      type: custom
+    nodes:
+    - data:
+        desc: 输入一个用户query，生成主路由与子工作流执行检查清单
+        selected: false
+        title: 开始
+        type: start
+        variables:
+        - label: query
+          max_length: 1000
+          options: []
+          required: true
+          type: text-input
+          variable: query
+      height: 120
+      id: start_node
+      position:
+        x: 80
+        y: 300
+      positionAbsolute:
+        x: 80
+        y: 300
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+    - data:
+        context:
+          enabled: false
+        desc: 生成分路由测试样例集
+        memory:
+          role_prefix:
+            assistant: ''
+            user: ''
+          window:
+            enabled: false
+            size: 5
+        model:
+          completion_params:
+            max_tokens: 360
+            temperature: 0.2
+            top_p: 0.9
+          mode: chat
+          name: qwen3-max
+          provider: langgenius/tongyi/tongyi
+        prompt_template:
+        - id: casegen-system
+          role: system
+          text: |
+            你是联调测试设计师。输出JSON：
+            {
+              "cases":{
+                "control":["...","..."],
+                "rag":["...","..."],
+                "data":["...","..."]
+              }
+            }
+        - id: casegen-user
+          role: user
+          text: "{{#start_node.query#}}"
+        selected: false
+        title: 测试样例生成
+        type: llm
+        variables: []
+        vision:
+          enabled: false
+      height: 132
+      id: llm_case_gen
+      position:
+        x: 380
+        y: 140
+      positionAbsolute:
+        x: 380
+        y: 140
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+    - data:
+        context:
+          enabled: false
+        desc: 生成联调检查清单
+        memory:
+          role_prefix:
+            assistant: ''
+            user: ''
+          window:
+            enabled: false
+            size: 5
+        model:
+          completion_params:
+            max_tokens: 768
+            temperature: 0.1
+            top_p: 0.9
+          mode: chat
+          name: qwen3-max
+          provider: langgenius/tongyi/tongyi
+        prompt_template:
+        - id: check-system
+          role: system
+          text: |
+            根据用户query判断应路由到哪个子工作流，并输出JSON：
+            {
+              "status":"success",
+              "message":"orchestration_smoke_ready",
+              "payload":{
+                "expected_target_workflow":"02_home_control_workflow|03_rag_qa_workflow|04_data_analysis_workflow",
+                "checklist":["...","...","..."]
+              },
+              "trace_id":"..."
+            }
+        - id: check-user
+          role: user
+          text: |
+            query={{#start_node.query#}}
+            cases={{#llm_case_gen.text#}}
+        selected: false
+        title: 联调检查器
+        type: llm
+        variables: []
+        vision:
+          enabled: false
+      height: 132
+      id: llm_check
+      position:
+        x: 680
+        y: 300
+      positionAbsolute:
+        x: 680
+        y: 300
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+    - data:
+        context:
+          enabled: false
+        desc: 评估联调准备度与覆盖率
+        memory:
+          role_prefix:
+            assistant: ''
+            user: ''
+          window:
+            enabled: false
+            size: 5
+        model:
+          completion_params:
+            max_tokens: 320
+            temperature: 0.1
+            top_p: 0.9
+          mode: chat
+          name: qwen3-max
+          provider: langgenius/tongyi/tongyi
+        prompt_template:
+        - id: score-system
+          role: system
+          text: |
+            你是验收评分助手。基于输入内容输出JSON：
+            {
+              "readiness_score":0,
+              "coverage_score":0,
+              "blockers":["..."],
+              "next_actions":["..."]
+            }
+        - id: score-user
+          role: user
+          text: "{{#llm_check.text#}}"
+        selected: false
+        title: 验收评分
+        type: llm
+        variables: []
+        vision:
+          enabled: false
+      height: 132
+      id: llm_score
+      position:
+        x: 980
+        y: 300
+      positionAbsolute:
+        x: 980
+        y: 300
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+    - data:
+        desc: 输出
+        outputs:
+        - value_selector:
+          - llm_score
+          - text
+          variable: result
+        selected: false
+        title: 输出
+        type: end
+      height: 120
+      id: end_node
+      position:
+        x: 1280
+        y: 300
+      positionAbsolute:
+        x: 1280
+        y: 300
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+    viewport:
+      x: -20
+      y: -20
+      zoom: 1
+  rag_pipeline_variables: []
