@@ -58,5 +58,28 @@ class HomeAssistantService:
         except Exception:
             return False
 
+    async def get_history(
+        self,
+        entity_ids: list[str],
+        start_time: str,
+        end_time: str,
+    ) -> list:
+        """
+        获取 HA 历史数据
+        GET /api/history/period/{start_time}?filter_entity_id=...&end_time=...
+        返回格式: [[{entity_id, state, last_changed}, ...], ...]
+        """
+        filter_str = ",".join(entity_ids)
+        url = (
+            f"{self.base_url}/api/history/period/{start_time}"
+            f"?filter_entity_id={filter_str}"
+            f"&minimal_response&no_attributes"
+            f"&end_time={end_time}"
+        )
+        async with httpx.AsyncClient(timeout=15) as client:
+            r = await client.get(url, headers=self.headers)
+            r.raise_for_status()
+            return r.json()
+
 
 ha_service = HomeAssistantService()

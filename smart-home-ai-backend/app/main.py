@@ -9,6 +9,7 @@ from app.routers import (
     auth,
     chat,
     devices,
+    monitor,
     states,
     knowledge,
     models_router,
@@ -51,6 +52,7 @@ app.add_middleware(
 app.include_router(auth.router, prefix="/api/v1")
 app.include_router(chat.router, prefix="/api/v1")
 app.include_router(devices.router, prefix="/api/v1")
+app.include_router(monitor.router, prefix="/api/v1")
 app.include_router(states.router, prefix="/api/v1")
 app.include_router(knowledge.router, prefix="/api/v1")
 app.include_router(models_router.router, prefix="/api/v1")

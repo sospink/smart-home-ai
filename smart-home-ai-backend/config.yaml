@@ -1,0 +1,40 @@
+# ═══════════════════════════════════════════════════════
+# Smart Home AI Backend — 应用配置
+# 优先级：config.yaml > .env > 代码默认值
+# ═══════════════════════════════════════════════════════
+
+# ── 数据库 ──
+database:
+  url: mysql+aiomysql://root:123456@localhost:3306/smart_home_web
+
+# ── JWT 认证 ──
+jwt:
+  secret_key: smart-home-dev-secret-key-change-in-production
+  algorithm: HS256
+  access_token_expire_minutes: 1440   # 24小时
+
+# ── 外部服务 ──
+services:
+  ollama:
+    base_url: http://localhost:11434
+
+  homeassistant:
+    base_url: http://172.18.22.66:8123
+    token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJiMzg0ZTg1YTFjMDQ0YjliYjlhZWVkZjA4NDQ5ZDA3NiIsImlhdCI6MTc3NDQwODQxMywiZXhwIjoyMDg5NzY4NDEzfQ.zB2iSUhhCu1kiHECfuBXK1Fa8KTjLyBTsUCh5ugvWas
+
+  dify:
+    base_url: http://172.18.22.66
+    api_key: app-9wVUv6V1jF16XYCK9jRWSyGF
+    dataset_api_key: dataset-lxaxKM2FxRQb7DOXVSZh0qEb
+
+  influxdb:
+    url: http://localhost:8086
+    token: ""
+    org: smart-home
+    bucket: smart-home-data
+
+# ── CORS 跨域 ──
+cors:
+  origins:
+    - http://localhost:3000
+    - http://localhost:3100

@@ -60,6 +60,22 @@ async def login(body: LoginRequest, db: AsyncSession = Depends(get_db)):
         )
 
     token = create_access_token(user.id, user.role.value, user.username)
+
+    # 写入登录日志
+    try:
+        from app.models.operation_log import OperationLog
+        log = OperationLog(
+            type="user_login",
+            level="info",
+            title=f"用户 {user.username} 登录系统",
+            detail=f"user_id={user.id}, role={user.role.value}",
+            user_id=user.id,
+            username=user.username,
+        )
+        db.add(log)
+    except Exception:
+        pass  # 日志写入不影响登录
+
     return TokenResponse(access_token=token)
 
 
