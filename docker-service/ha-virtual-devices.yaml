@@ -1,0 +1,184 @@
+# ═══════════════════════════════════════════════════════
+# Home Assistant 虚拟设备配置
+# 将以下内容追加到 ha-config/configuration.yaml 末尾
+# 修改后在 HA → 开发者工具 → YAML → 全部重新加载
+# ═══════════════════════════════════════════════════════
+
+# ── 虚拟灯光（3个） ──────────────────────────────────
+light:
+  - platform: group
+    name: 全屋灯光
+    entities: []
+
+input_boolean:
+  # 灯光开关
+  light_living_room:
+    name: 客厅灯
+    icon: mdi:ceiling-light
+  light_bedroom:
+    name: 卧室灯
+    icon: mdi:lamp
+  light_study_room:
+    name: 书房灯
+    icon: mdi:desk-lamp
+  # 设备开关
+  coffee_machine:
+    name: 咖啡机
+    icon: mdi:coffee-maker
+  water_heater:
+    name: 热水器
+    icon: mdi:water-boiler
+  # 门锁
+  front_door_lock:
+    name: 前门门锁
+    icon: mdi:lock
+
+# ── 灯光亮度（模拟亮度数值） ──────────────────────────
+input_number:
+  light_living_room_brightness:
+    name: 客厅灯亮度
+    min: 0
+    max: 100
+    step: 1
+    unit_of_measurement: "%"
+    icon: mdi:brightness-6
+  light_bedroom_brightness:
+    name: 卧室灯亮度
+    min: 0
+    max: 100
+    step: 1
+    unit_of_measurement: "%"
+    icon: mdi:brightness-6
+  light_study_room_brightness:
+    name: 书房灯亮度
+    min: 0
+    max: 100
+    step: 1
+    unit_of_measurement: "%"
+    icon: mdi:brightness-6
+  # 空调温度
+  ac_temperature:
+    name: 空调温度设定
+    min: 16
+    max: 30
+    step: 1
+    unit_of_measurement: "°C"
+    icon: mdi:thermometer
+
+# ── 空调模式 ──────────────────────────────────────────
+input_select:
+  ac_mode:
+    name: 空调模式
+    options:
+      - "制冷"
+      - "制热"
+      - "送风"
+      - "自动"
+    initial: "制冷"
+    icon: mdi:air-conditioner
+  ac_power:
+    name: 空调开关
+    options:
+      - "开"
+      - "关"
+    initial: "关"
+    icon: mdi:power
+
+# ── 虚拟传感器（使用 template sensor） ────────────────
+template:
+  - sensor:
+      - name: "室内温度"
+        unique_id: sensor_indoor_temperature
+        unit_of_measurement: "°C"
+        device_class: temperature
+        state: "{{ (range(200, 280) | random / 10) | round(1) }}"
+        icon: mdi:thermometer
+
+      - name: "室内湿度"
+        unique_id: sensor_indoor_humidity
+        unit_of_measurement: "%"
+        device_class: humidity
+        state: "{{ (range(40, 70) | random) }}"
+        icon: mdi:water-percent
+
+      - name: "PM2.5"
+        unique_id: sensor_pm25
+        unit_of_measurement: "μg/m³"
+        state: "{{ (range(15, 85) | random) }}"
+        icon: mdi:air-filter
+
+      - name: "当前功耗"
+        unique_id: sensor_power_consumption
+        unit_of_measurement: "W"
+        device_class: power
+        state: "{{ (range(200, 1500) | random) }}"
+        icon: mdi:flash
+
+  - binary_sensor:
+      - name: "前门"
+        unique_id: binary_sensor_front_door
+        device_class: door
+        state: "{{ states('input_boolean.front_door_lock') }}"
+        icon: mdi:door
+
+# ── 场景预设 ─────────────────────────────────────────
+scene:
+  - name: "回家模式"
+    icon: mdi:home
+    entities:
+      input_boolean.light_living_room:
+        state: "on"
+      input_boolean.light_bedroom:
+        state: "off"
+      input_number.light_living_room_brightness:
+        value: 80
+      input_select.ac_power:
+        option: "开"
+      input_number.ac_temperature:
+        value: 24
+
+  - name: "离家模式"
+    icon: mdi:exit-run
+    entities:
+      input_boolean.light_living_room:
+        state: "off"
+      input_boolean.light_bedroom:
+        state: "off"
+      input_boolean.light_study_room:
+        state: "off"
+      input_boolean.coffee_machine:
+        state: "off"
+      input_select.ac_power:
+        option: "关"
+      input_boolean.front_door_lock:
+        state: "on"
+
+  - name: "睡眠模式"
+    icon: mdi:weather-night
+    entities:
+      input_boolean.light_living_room:
+        state: "off"
+      input_boolean.light_study_room:
+        state: "off"
+      input_boolean.light_bedroom:
+        state: "on"
+      input_number.light_bedroom_brightness:
+        value: 20
+      input_select.ac_power:
+        option: "开"
+      input_number.ac_temperature:
+        value: 26
+      input_boolean.front_door_lock:
+        state: "on"
+
+  - name: "影院模式"
+    icon: mdi:movie-open
+    entities:
+      input_boolean.light_living_room:
+        state: "on"
+      input_number.light_living_room_brightness:
+        value: 15
+      input_boolean.light_bedroom:
+        state: "off"
+      input_boolean.light_study_room:
+        state: "off"

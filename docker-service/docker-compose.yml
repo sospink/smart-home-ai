@@ -1,0 +1,64 @@
+services:
+  # ─────────────────────────────────────────
+  # Code Server — Web IDE (port 8443)
+  # Image: lscr.io/linuxserver/code-server
+  # Docs: https://docs.linuxserver.io/images/docker-code-server/
+  # ─────────────────────────────────────────
+  code-server:
+    image: lscr.io/linuxserver/code-server:latest
+    container_name: code-server
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=${TZ:-Asia/Shanghai}
+      - AUTH=none
+      - SUDO_PASSWORD=${CODE_SERVER_SUDO_PASSWORD}
+    ports:
+      - "8443:8443"
+    volumes:
+      - code-server-config:/config
+      - ${WORKSPACE_PATH:-../}:/home/coder/project
+    restart: unless-stopped
+
+  # ─────────────────────────────────────────
+  # JupyterLab — Interactive Python Notebook (port 8888)
+  # Image: quay.io/jupyter/scipy-notebook
+  # Docs: https://jupyter-docker-stacks.readthedocs.io/
+  # ─────────────────────────────────────────
+  jupyterlab:
+    image: quay.io/jupyter/scipy-notebook:latest
+    container_name: jupyterlab
+    environment:
+      - JUPYTER_TOKEN=""
+      - CHOWN_HOME=yes
+      - NB_UID=1000
+      - NB_GID=1000
+      - TZ=${TZ:-Asia/Shanghai}
+    ports:
+      - "8888:8888"
+    volumes:
+      - ${NOTEBOOKS_PATH:-./notebooks}:/home/jovyan/work
+    command: start-notebook.py --NotebookApp.token='' --NotebookApp.password=''
+    restart: unless-stopped
+
+  # ─────────────────────────────────────────
+  # Home Assistant — Smart Home Platform (port 8123)
+  # Image: ghcr.io/home-assistant/home-assistant:stable
+  # Docs: https://www.home-assistant.io/installation/
+  # 注意：network_mode: host 是官方要求，用于 mDNS/设备自动发现
+  # ─────────────────────────────────────────
+  home-assistant:
+    image: ghcr.io/home-assistant/home-assistant:stable
+    container_name: home-assistant
+    privileged: true
+    network_mode: host
+    environment:
+      - TZ=${TZ:-Asia/Shanghai}
+    volumes:
+      - ${HA_CONFIG_PATH:-./ha-config}:/config
+      - /run/dbus:/run/dbus:ro
+      - /etc/localtime:/etc/localtime:ro
+    restart: unless-stopped
+
+volumes:
+  code-server-config:
