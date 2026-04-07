@@ -8,50 +8,23 @@
 
 ```
 docs/
-├── contract/           # 合同与验收
-├── deploy/             # 部署与运维
-├── design/             # 设计与架构
-└── *.md                # 综合文档
+├── README.md                          # 本文件（文档索引）
+├── contract/                          # 合同与验收
+│   └── 合同技术参数与完成度对照.md       # 40 项合同原文 + 逐条实现对照（100% 完成）
+├── deploy/                            # 部署与运维
+│   └── 部署运维手册.md                  # 环境配置/服务部署/模型管理/HA对接/故障排查/验收指引
+└── design/                            # 技术设计
+    ├── 技术设计文档.md                  # 架构设计/API路由/页面规格/设备注册表/技术决策
+    └── dify-api.md                    # Dify Chatflow API 完整接口文档
 ```
 
 ---
 
-## 📋 合同与验收 (`contract/`)
+## 文档说明
 
-| 文档 | 说明 |
-|------|------|
-| [合同技术要求-江门定开.md](contract/合同技术要求-江门定开.md) | 合同原文 — 40 条技术要求 |
-| [contract-progress-20260325.md](contract/contract-progress-20260325.md) | 合同完成度对比报告（42.5% → 75%） |
-| [phase1_contract_compliance.md](contract/phase1_contract_compliance.md) | Phase 1 合规性报告 |
-
-## 🚀 部署与运维 (`deploy/`)
-
-| 文档 | 说明 |
-|------|------|
-| [delivery-smart-home.md](deploy/delivery-smart-home.md) | 交付文档（服务器 IP、端口、架构） |
-| [deploy-report-20260321.md](deploy/deploy-report-20260321.md) | 部署报告（2026-03-21） |
-| [fix-20260321.md](deploy/fix-20260321.md) | 问题修复记录 |
-| [部署运维手册.md](deploy/智慧家居LLM智能体一体机_部署运维手册.md) | 完整运维手册 |
-
-## 🏗️ 设计与架构 (`design/`)
-
-| 文档 | 说明 |
-|------|------|
-| [api.md](design/api.md) | API 接口设计文档 |
-| [page_specs.md](design/page_specs.md) | 页面功能规格书（4 个页面的详细规格） |
-| [架构设计文档.md](design/智慧家居Web平台_架构设计文档.md) | Web 平台架构设计 |
-| [项目规划.md](design/智慧家居LLM智能体一体机_项目规划.md) | 项目总体规划 |
-| [技术调研笔记.md](design/技术调研笔记_Dify与HA关键问题.md) | Dify 与 HA 技术调研 |
-
-## 📈 综合文档
-
-| 文档 | 说明 |
-|------|------|
-| [progress-20260325.md](progress-20260325.md) | 最新进度报告 |
-| [hardware_integration_guide.md](hardware_integration_guide.md) | 硬件对接指南 |
-| [开发排期表.md](智慧家居LLM智能体一体机_开发排期表.md) | 开发排期 |
-| [项目汇报.md](智慧家居LLM智能体一体机_项目汇报.md) | 项目汇报材料 |
-
----
-
-*最后更新: 2026-03-25*
+| 文档 | 用途 | 最近更新 |
+|---|---|---|
+| **合同技术参数与完成度对照** | 合同 40 项原文 + 每条的实现方式和状态，用于验收对照 | 2026-04-07 |
+| **部署运维手册** | 从环境搭建到日常运维的完整操作指南，含首次部署记录和故障排查 | 2026-04-07 |
+| **技术设计文档** | 系统架构、后端 64 个 API、前端 12 个页面、设备注册表、HA 配置等技术细节 | 2026-04-07 |
+| **Dify API 文档** | Dify Chatflow 应用的完整 API 参考（对话/文件/会话/反馈/语音等 26 个接口） | 2026-03-25 |

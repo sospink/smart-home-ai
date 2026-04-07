@@ -64,6 +64,11 @@ def _load_yaml_config() -> dict:
     if influx.get("bucket"):
         flat["INFLUXDB_BUCKET"] = influx["bucket"]
 
+    # agent
+    agent = raw.get("agent", {})
+    if agent.get("api_key"):
+        flat["AGENT_API_KEY"] = agent["api_key"]
+
     # cors
     cors = raw.get("cors", {})
     if cors.get("origins"):
@@ -96,6 +101,9 @@ class Settings(BaseSettings):
     INFLUXDB_TOKEN: str = ""
     INFLUXDB_ORG: str = "smart-home"
     INFLUXDB_BUCKET: str = "smart-home-data"
+
+    # ── Agent API Key（供 Dify 工作流调用后端接口） ──
+    AGENT_API_KEY: str = "sk-smart-home-agent-2026"
 
     # ── CORS ──
     CORS_ORIGINS: List[str] = ["http://localhost:3000", "http://localhost:3100"]

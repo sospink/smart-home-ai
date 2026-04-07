@@ -6,7 +6,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from typing import Optional
-from app.dependencies import get_current_user, get_db
+from app.dependencies import get_current_user, get_agent_or_user, get_db
 from app.services.homeassistant import ha_service
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -222,6 +222,46 @@ async def health():
     }
 
 
+@router.get("/search", summary="按名称搜索设备")
+async def search_device(
+    name: str,
+    _user=Depends(get_agent_or_user),
+):
+    """
+    按中文名称搜索设备（供 Dify 工作流调用）
+
+    - **name**: 设备名称，如 "客厅灯"、"热水器"
+    - 支持模糊匹配（名称包含关键字即可）
+    - 返回 device_id 和可用操作列表
+    """
+    results = []
+    for dev in DEVICE_REGISTRY:
+        if name in dev["name"] or dev["name"] in name:
+            # 根据 category 推断可用操作
+            actions = ["turn_on", "turn_off"]
+            if dev["category"] == "lock":
+                actions = ["turn_on", "turn_off"]  # lock=turn_on, unlock=turn_off
+            elif dev["category"] == "sensor":
+                actions = []  # 传感器不可控制
+
+            # 获取主实体（第一个 entity 用于控制）
+            main_entity = list(dev["entities"].values())[0] if dev["entities"] else None
+
+            results.append({
+                "device_id": dev["id"],
+                "name": dev["name"],
+                "category": dev["category"],
+                "description": dev["description"],
+                "main_entity_id": main_entity,
+                "available_actions": actions,
+            })
+
+    if not results:
+        raise HTTPException(404, f"未找到设备: {name}")
+
+    return {"devices": results, "count": len(results)}
+
+
 @router.get("/", summary="设备列表")
 async def list_devices(
     category: Optional[str] = None,
@@ -332,7 +372,7 @@ async def get_entity(
 async def control_device(
     entity_id: str,
     req: ControlRequest,
-    _user=Depends(get_current_user),
+    _user=Depends(get_agent_or_user),
     db: AsyncSession = Depends(get_db),
 ):
     """

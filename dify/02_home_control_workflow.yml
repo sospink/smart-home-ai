@@ -1,5 +1,5 @@
 app:
-  description: 家居控制子 Workflow（第一阶段 Mock，后续替换 HA API）
+  description: 家居控制子 Workflow — 解析意图 → 搜索设备 → 调用 FastAPI → 真实控制 HA
   icon: "🏠"
   icon_background: '#FEE2E2'
   mode: workflow
@@ -62,27 +62,45 @@ workflow:
       type: custom
     - data:
         sourceType: llm
-        targetType: llm
-      id: parse-to-strategy
+        targetType: code
+      id: parse-to-code
       source: llm_parse
       sourceHandle: source
-      target: llm_strategy
+      target: code_extract
       targetHandle: target
       type: custom
     - data:
-        sourceType: llm
-        targetType: llm
-      id: strategy-to-mock
-      source: llm_strategy
+        sourceType: code
+        targetType: http-request
+      id: code-to-search
+      source: code_extract
       sourceHandle: source
-      target: llm_mock_execute
+      target: http_search
       targetHandle: target
       type: custom
     - data:
-        sourceType: llm
+        sourceType: http-request
+        targetType: code
+      id: search-to-build
+      source: http_search
+      sourceHandle: source
+      target: code_build_control
+      targetHandle: target
+      type: custom
+    - data:
+        sourceType: code
+        targetType: http-request
+      id: build-to-control
+      source: code_build_control
+      sourceHandle: source
+      target: http_control
+      targetHandle: target
+      type: custom
+    - data:
+        sourceType: http-request
         targetType: llm
-      id: mock-to-present
-      source: llm_mock_execute
+      id: control-to-present
+      source: http_control
       sourceHandle: source
       target: llm_present
       targetHandle: target
@@ -97,6 +115,7 @@ workflow:
       targetHandle: target
       type: custom
     nodes:
+    # ── 1. 开始节点 ──
     - data:
         desc: 家居控制请求输入
         selected: false
@@ -143,10 +162,12 @@ workflow:
       targetPosition: left
       type: custom
       width: 242
+
+    # ── 2. LLM 解析意图 ──
     - data:
         context:
           enabled: false
-        desc: 解析控制意图为结构化参数
+        desc: 解析控制意图为结构化 JSON
         memory:
           role_prefix:
             assistant: ''
@@ -156,28 +177,46 @@ workflow:
             size: 5
         model:
           completion_params:
-            max_tokens: 220
+            max_tokens: 300
             temperature: 0.1
             top_p: 0.9
           mode: chat
-          name: qwen3-max
-          provider: langgenius/tongyi/tongyi
+          name: qwen3:4b
+          provider: langgenius/ollama/ollama
         prompt_template:
         - id: parse-system
           role: system
           text: |
-            将控制请求解析为JSON（只输出JSON）：
+            你是智能家居控制意图解析器。将用户的自然语言指令解析为 JSON。
+
+            可用设备列表：
+            - 客厅灯（灯光，支持 turn_on / turn_off）
+            - 卧室灯（灯光，支持 turn_on / turn_off）
+            - 书房灯（灯光，支持 turn_on / turn_off）
+            - 主卧空调（空调，支持 turn_on / turn_off）
+            - 咖啡机（开关，支持 turn_on / turn_off）
+            - 热水器（开关，支持 turn_on / turn_off）
+            - 前门门锁（安防，支持 turn_on=锁定 / turn_off=解锁）
+
+            只输出 JSON，格式如下：
             {
-              "entity_id":"light.living_room",
-              "action":"turn_on|turn_off|set_temperature|set_brightness",
-              "value":0,
-              "reason":"..."
+              "device_name": "客厅灯",
+              "action": "turn_on",
+              "confidence": 0.95
+            }
+
+            如果无法识别设备或操作，返回：
+            {
+              "device_name": null,
+              "action": null,
+              "confidence": 0,
+              "error": "无法识别的指令"
             }
         - id: parse-user
           role: user
           text: "{{#start_node.query#}}"
         selected: false
-        title: 控制参数解析
+        title: 意图解析
         type: llm
         variables: []
         vision:
@@ -195,117 +234,54 @@ workflow:
       targetPosition: left
       type: custom
       width: 242
+
+    # ── 3. Code 提取 JSON 字段 ──
     - data:
-        context:
-          enabled: false
-        desc: 生成可执行策略与风控说明
-        memory:
-          role_prefix:
-            assistant: ''
-            user: ''
-          window:
-            enabled: false
-            size: 5
-        model:
-          completion_params:
-            max_tokens: 260
-            temperature: 0.1
-            top_p: 0.9
-          mode: chat
-          name: qwen3-max
-          provider: langgenius/tongyi/tongyi
-        prompt_template:
-        - id: strategy-system
-          role: system
-          text: |
-            你是控制策略节点。将解析结果转为执行计划JSON：
-            {
-              "intent":"device_control",
-              "execution_plan":{
-                "step_1":"参数校验",
-                "step_2":"目标设备确认",
-                "step_3":"执行控制"
-              },
-              "risk_level":"low|medium|high",
-              "risk_note":"..."
-            }
-            仅输出JSON。
-        - id: strategy-user
-          role: user
-          text: "{{#llm_parse.text#}}"
+        code: |
+          import json
+          import re
+
+          def main(llm_output: str) -> dict:
+              """从 LLM 输出中提取 device_name 和 action"""
+              try:
+                  # 尝试提取 JSON 块
+                  json_match = re.search(r'\{[^}]+\}', llm_output, re.DOTALL)
+                  if json_match:
+                      parsed = json.loads(json_match.group())
+                  else:
+                      parsed = json.loads(llm_output)
+
+                  device_name = parsed.get("device_name", "")
+                  action = parsed.get("action", "turn_on")
+
+                  if not device_name:
+                      return {"device_name": "", "action": "", "error": "无法识别设备"}
+
+                  return {"device_name": device_name, "action": action, "error": ""}
+              except Exception as e:
+                  return {"device_name": "", "action": "", "error": str(e)}
+        code_language: python3
+        desc: 从 LLM JSON 输出中提取 device_name 和 action
+        outputs:
+          device_name:
+            children: null
+            type: string
+          action:
+            children: null
+            type: string
+          error:
+            children: null
+            type: string
         selected: false
-        title: 执行策略评估
-        type: llm
-        variables: []
-        vision:
-          enabled: false
-      height: 132
-      id: llm_strategy
-      position:
-        x: 680
-        y: 140
-      positionAbsolute:
-        x: 680
-        y: 140
-      selected: false
-      sourcePosition: right
-      targetPosition: left
-      type: custom
-      width: 242
-    - data:
-        context:
-          enabled: false
-        desc: 控制执行 Mock（统一结构化输出）
-        memory:
-          role_prefix:
-            assistant: ''
-            user: ''
-          window:
-            enabled: false
-            size: 5
-        model:
-          completion_params:
-            max_tokens: 320
-            temperature: 0.1
-            top_p: 0.9
-          mode: chat
-          name: qwen3-max
-          provider: langgenius/tongyi/tongyi
-        prompt_template:
-        - id: mock-system
-          role: system
-          text: |
-            你是控制执行Mock节点。根据输入参数，输出JSON（不得输出其他文本）：
-            {
-              "status":"success",
-              "message":"home_control_mock_ok",
-              "payload":{
-                "intent":"...",
-                "parsed":{},
-                "execution":{
-                  "mode":"mock",
-                  "endpoint":"TODO_REAL_ENDPOINT",
-                  "note":"第二阶段替换为 Home Assistant API"
-                }
-              },
-              "trace_id":"..."
-            }
-        - id: mock-user
-          role: user
-          text: |
-            user_id={{#start_node.user_id#}}
-            session_id={{#start_node.session_id#}}
-            query={{#start_node.query#}}
-            parsed={{#llm_parse.text#}}
-            strategy={{#llm_strategy.text#}}
-        selected: false
-        title: 控制执行Mock
-        type: llm
-        variables: []
-        vision:
-          enabled: false
-      height: 132
-      id: llm_mock_execute
+        title: 提取参数
+        type: code
+        variables:
+        - value_selector:
+          - llm_parse
+          - text
+          variable: llm_output
+      height: 54
+      id: code_extract
       position:
         x: 680
         y: 300
@@ -317,10 +293,170 @@ workflow:
       targetPosition: left
       type: custom
       width: 242
+
+    # ── 4. HTTP 搜索设备 ──
+    - data:
+        authorization:
+          config: null
+          type: no-auth
+        body:
+          data: ''
+          type: none
+        desc: 调用 FastAPI /devices/search 获取 entity_id
+        headers: 'X-Agent-Key:sk-smart-home-agent-2026'
+        method: get
+        params: 'name:{{#code_extract.device_name#}}'
+        retry_config:
+          max_retries: 2
+          retry_enabled: true
+          retry_interval: 1000
+        selected: false
+        ssl_verify: false
+        timeout:
+          max_connect_timeout: 10
+          max_read_timeout: 15
+          max_write_timeout: 10
+        title: 搜索设备
+        type: http-request
+        url: http://172.18.22.66:8000/api/v1/devices/search
+        variables: []
+      height: 136
+      id: http_search
+      position:
+        x: 980
+        y: 300
+      positionAbsolute:
+        x: 980
+        y: 300
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+
+    # ── 5. Code 构建控制请求 ──
+    - data:
+        code: |
+          import json
+
+          def main(search_body: str, action: str) -> dict:
+              """从搜索结果提取 entity_id，构建控制 URL"""
+              try:
+                  data = json.loads(search_body)
+                  devices = data.get("devices", [])
+                  if not devices:
+                      return {"entity_id": "", "control_url": "", "error": "设备未找到"}
+
+                  device = devices[0]
+                  entity_id = device.get("main_entity_id", "")
+                  device_name = device.get("name", "")
+
+                  control_url = f"http://172.18.22.66:8000/api/v1/devices/{entity_id}/control"
+
+                  return {
+                      "entity_id": entity_id,
+                      "device_name": device_name,
+                      "control_url": control_url,
+                      "action": action,
+                      "error": ""
+                  }
+              except Exception as e:
+                  return {"entity_id": "", "control_url": "", "error": str(e)}
+        code_language: python3
+        desc: 从搜索结果构建控制 URL 和请求体
+        outputs:
+          entity_id:
+            children: null
+            type: string
+          device_name:
+            children: null
+            type: string
+          control_url:
+            children: null
+            type: string
+          action:
+            children: null
+            type: string
+          error:
+            children: null
+            type: string
+        selected: false
+        title: 构建控制请求
+        type: code
+        variables:
+        - value_selector:
+          - http_search
+          - body
+          variable: search_body
+        - value_selector:
+          - code_extract
+          - action
+          variable: action
+      height: 54
+      id: code_build_control
+      position:
+        x: 1280
+        y: 300
+      positionAbsolute:
+        x: 1280
+        y: 300
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+
+    # ── 6. HTTP 控制设备 ──
+    - data:
+        authorization:
+          config: null
+          type: no-auth
+        body:
+          data:
+          - id: control-body
+            key: ''
+            type: text
+            value: '{"service":"{{#code_build_control.action#}}"}'
+          type: raw-text
+        desc: 调用 FastAPI /devices/{entity_id}/control 真实控制 HA
+        headers: 'X-Agent-Key:sk-smart-home-agent-2026
+
+          Content-Type:application/json'
+        method: post
+        params: ''
+        retry_config:
+          max_retries: 2
+          retry_enabled: true
+          retry_interval: 1000
+        selected: false
+        ssl_verify: false
+        timeout:
+          max_connect_timeout: 10
+          max_read_timeout: 15
+          max_write_timeout: 10
+        title: 控制设备
+        type: http-request
+        url: '{{#code_build_control.control_url#}}'
+        variables: []
+      height: 136
+      id: http_control
+      position:
+        x: 1580
+        y: 300
+      positionAbsolute:
+        x: 1580
+        y: 300
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+
+    # ── 7. LLM 生成用户回复 ──
     - data:
         context:
           enabled: false
-        desc: 生成面向客户的控制反馈话术
+        desc: 将控制结果转为用户友好的回复
         memory:
           role_prefix:
             assistant: ''
@@ -334,23 +470,28 @@ workflow:
             temperature: 0.2
             top_p: 0.9
           mode: chat
-          name: qwen3-max
-          provider: langgenius/tongyi/tongyi
+          name: qwen3:4b
+          provider: langgenius/ollama/ollama
         prompt_template:
         - id: present-system
           role: system
           text: |
-            你是“家居控制执行回执助手”。
-            把输入JSON转成简洁专业回复，包含：
-            1) 执行动作
-            2) 执行结果
-            3) 下一步建议
-            不要输出JSON。
+            你是智能家居控制助手。根据设备控制的执行结果，生成简洁友好的中文回复。
+
+            规则：
+            1. 如果 success=true，回复格式："已为您{动作}{设备名} ✅"
+            2. 如果失败，说明原因并建议重试
+            3. 不要输出 JSON，只输出自然语言
+            4. 回复要简洁，一两句话即可
         - id: present-user
           role: user
-          text: "{{#llm_mock_execute.text#}}"
+          text: |
+            用户原始请求：{{#start_node.query#}}
+            设备名称：{{#code_build_control.device_name#}}
+            执行操作：{{#code_build_control.action#}}
+            控制结果：{{#http_control.body#}}
         selected: false
-        title: 客户可读回执
+        title: 生成回复
         type: llm
         variables: []
         vision:
@@ -358,16 +499,18 @@ workflow:
       height: 132
       id: llm_present
       position:
-        x: 980
+        x: 1880
         y: 300
       positionAbsolute:
-        x: 980
+        x: 1880
         y: 300
       selected: false
       sourcePosition: right
       targetPosition: left
       type: custom
       width: 242
+
+    # ── 8. 输出节点 ──
     - data:
         desc: 控制结果输出
         outputs:
@@ -381,10 +524,10 @@ workflow:
       height: 120
       id: end_node
       position:
-        x: 1280
+        x: 2180
         y: 300
       positionAbsolute:
-        x: 1280
+        x: 2180
         y: 300
       selected: false
       sourcePosition: right
@@ -394,5 +537,5 @@ workflow:
     viewport:
       x: -60
       y: -20
-      zoom: 0.9
+      zoom: 0.7
   rag_pipeline_variables: []

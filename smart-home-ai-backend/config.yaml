@@ -19,9 +19,9 @@ services:
     base_url: http://localhost:11434
 
   homeassistant:
-    base_url: http://172.18.22.66:8123
-    token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJiMzg0ZTg1YTFjMDQ0YjliYjlhZWVkZjA4NDQ5ZDA3NiIsImlhdCI6MTc3NDQwODQxMywiZXhwIjoyMDg5NzY4NDEzfQ.zB2iSUhhCu1kiHECfuBXK1Fa8KTjLyBTsUCh5ugvWas
-
+    base_url: http://42.240.132.79:8123
+    #token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJiMzg0ZTg1YTFjMDQ0YjliYjlhZWVkZjA4NDQ5ZDA3NiIsImlhdCI6MTc3NDQwODQxMywiZXhwIjoyMDg5NzY4NDEzfQ.zB2iSUhhCu1kiHECfuBXK1Fa8KTjLyBTsUCh5ugvWas
+    token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiI2NTkzYmNhN2IyNTE0Yjg3ODc0NTFmNmI5YzQ1Nzc3OCIsImlhdCI6MTc3NDg4MDQ1MSwiZXhwIjoyMDkwMjQwNDUxfQ.82Zfwz5Ribclqn1I4ngwjopqtOj4phbV7AS6M908FTg
   dify:
     base_url: http://172.18.22.66
     api_key: app-9wVUv6V1jF16XYCK9jRWSyGF
@@ -38,3 +38,7 @@ cors:
   origins:
     - http://localhost:3000
     - http://localhost:3100
+
+# ── Agent API Key（供 Dify 工作流调用后端接口）──
+agent:
+  api_key: sk-smart-home-agent-2026
