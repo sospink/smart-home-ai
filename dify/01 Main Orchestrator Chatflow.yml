@@ -344,7 +344,7 @@ workflow:
             value: '{"inputs":{"user_id":"{{#start_node.user_id#}}","session_id":"{{#start_node.session_id#}}","query":"{{#sys.query#}}","context":"{{#start_node.context#}}"},"response_mode":"blocking","user":"orchestrator-main"}'
           type: raw-text
         desc: 自动调用 02_home_control_workflow
-        headers: 'Authorization:Bearer app-Tk0exFJfo1mlRbFOqbVvd9oU
+        headers: 'Authorization:Bearer {{DIFY_HOME_CONTROL_WORKFLOW_APP_KEY}}
 
           Content-Type:application/json'
         method: post
@@ -361,7 +361,7 @@ workflow:
           max_write_timeout: 0
         title: 调用控制子流程
         type: http-request
-        url: http://117.50.80.138/v1/workflows/run
+        url: '{{DIFY_BASE_URL}}/v1/workflows/run'
         variables: []
       height: 136
       id: llm_control_dispatch
@@ -388,7 +388,7 @@ workflow:
             value: '{"inputs":{"user_id":"{{#start_node.user_id#}}","session_id":"{{#start_node.session_id#}}","query":"{{#sys.query#}}","context":"{{#start_node.context#}}"},"response_mode":"blocking","user":"orchestrator-main"}'
           type: raw-text
         desc: 自动调用 03_rag_qa_workflow
-        headers: 'Authorization:Bearer app-1xTVEvyKqPjHujSxNoZXUvJ1
+        headers: 'Authorization:Bearer {{DIFY_RAG_WORKFLOW_APP_KEY}}
 
           Content-Type:application/json'
         method: post
@@ -405,7 +405,7 @@ workflow:
           max_write_timeout: 0
         title: 调用RAG子流程
         type: http-request
-        url: http://117.50.80.138/v1/workflows/run
+        url: '{{DIFY_BASE_URL}}/v1/workflows/run'
         variables: []
       height: 136
       id: llm_rag_dispatch
@@ -432,7 +432,7 @@ workflow:
             value: '{"inputs":{"user_id":"{{#start_node.user_id#}}","session_id":"{{#start_node.session_id#}}","query":"{{#sys.query#}}","context":"{{#start_node.context#}}"},"response_mode":"blocking","user":"orchestrator-main"}'
           type: raw-text
         desc: 自动调用 04_data_analysis_workflow
-        headers: 'Authorization:Bearer app-79YgYlTDQ5VjuLjKPdMv1ElH
+        headers: 'Authorization:Bearer {{DIFY_DATA_ANALYSIS_WORKFLOW_APP_KEY}}
 
           Content-Type:application/json'
         method: post
@@ -449,7 +449,7 @@ workflow:
           max_write_timeout: 0
         title: 调用数据子流程
         type: http-request
-        url: http://117.50.80.138/v1/workflows/run
+        url: '{{DIFY_BASE_URL}}/v1/workflows/run'
         variables: []
       height: 136
       id: llm_data_dispatch

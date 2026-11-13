@@ -1,17 +1,22 @@
 # ═══════════════════════════════════════════════════════
-# Smart Home AI Backend — 应用配置
-# 优先级：config.yaml > .env > 代码默认值
+# Smart Home AI Backend — 本地开发配置模板
+# 优先级：显式环境变量 > config.yaml > 代码默认值
+# 注意：本文件只能保存非敏感默认值。数据库密码、HA Token、Dify Key、Dataset Key、Agent Key
+# 必须通过环境变量或后台系统设置注入，真实凭证泄露后必须立即轮换。
 # ═══════════════════════════════════════════════════════
 
 # ── 数据库 ──
 database:
-  url: mysql+aiomysql://root:123456@localhost:3306/smart_home_web
+  # 留空则使用代码默认值或 DATABASE_URL 环境变量。
+  # 示例：mysql+aiomysql://<USER>:<PASSWORD>@<HOST>:3306/smart_home_web
+  url: ""
 
 # ── JWT 认证 ──
 jwt:
-  secret_key: smart-home-dev-secret-key-change-in-production
+  # 生产环境必须通过 SECRET_KEY 环境变量覆盖，并使用高强度随机值。
+  secret_key: "CHANGE_ME_USE_SECRET_KEY_ENV"
   algorithm: HS256
-  access_token_expire_minutes: 1440   # 24小时
+  access_token_expire_minutes: 1440
 
 # ── 外部服务 ──
 services:
@@ -19,13 +24,13 @@ services:
     base_url: http://localhost:11434
 
   homeassistant:
-    base_url: http://42.240.132.79:8123
-    #token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJiMzg0ZTg1YTFjMDQ0YjliYjlhZWVkZjA4NDQ5ZDA3NiIsImlhdCI6MTc3NDQwODQxMywiZXhwIjoyMDg5NzY4NDEzfQ.zB2iSUhhCu1kiHECfuBXK1Fa8KTjLyBTsUCh5ugvWas
-    token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiI2NTkzYmNhN2IyNTE0Yjg3ODc0NTFmNmI5YzQ1Nzc3OCIsImlhdCI6MTc3NDg4MDQ1MSwiZXhwIjoyMDkwMjQwNDUxfQ.82Zfwz5Ribclqn1I4ngwjopqtOj4phbV7AS6M908FTg
+    base_url: http://192.168.34.190:8123
+    token: ""
+
   dify:
-    base_url: http://172.18.22.66
-    api_key: app-9wVUv6V1jF16XYCK9jRWSyGF
-    dataset_api_key: dataset-lxaxKM2FxRQb7DOXVSZh0qEb
+    base_url: http://192.168.34.190
+    api_key: ""
+    dataset_api_key: ""
 
   influxdb:
     url: http://localhost:8086
@@ -37,8 +42,8 @@ services:
 cors:
   origins:
     - http://localhost:3000
-    - http://localhost:3100
+    - http://localhost:8088
 
 # ── Agent API Key（供 Dify 工作流调用后端接口）──
 agent:
-  api_key: sk-smart-home-agent-2026
+  api_key: ""

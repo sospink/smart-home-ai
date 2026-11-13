@@ -15,13 +15,25 @@ Endpoints:
 """
 import httpx
 import json
-from typing import AsyncIterator
+from typing import AsyncIterator, Optional
 from app.config import settings
 
 
+def _extract_ollama_error(response: httpx.Response) -> str:
+    """提取 Ollama 原始错误，避免只暴露 HTTP 500。"""
+    try:
+        data = response.json()
+        if isinstance(data, dict) and data.get("error"):
+            return str(data["error"])
+    except Exception:
+        pass
+    text = response.text.strip()
+    return text or f"HTTP {response.status_code}"
+
+
 class OllamaService:
-    def __init__(self):
-        self.base_url = settings.OLLAMA_BASE_URL
+    def __init__(self, base_url: Optional[str] = None):
+        self.base_url = (base_url or settings.OLLAMA_BASE_URL).rstrip("/")
 
     # ══════════════════════════════════════════════
     #  模型管理 API
@@ -29,14 +41,14 @@ class OllamaService:
 
     async def list_models(self) -> list:
         """GET /api/tags — 获取已安装模型列表"""
-        async with httpx.AsyncClient(timeout=10) as client:
+        async with httpx.AsyncClient(timeout=10, trust_env=False) as client:
             r = await client.get(f"{self.base_url}/api/tags")
             r.raise_for_status()
             return r.json().get("models", [])
 
     async def show_model(self, name: str) -> dict:
         """POST /api/show — 获取模型详情"""
-        async with httpx.AsyncClient(timeout=10) as client:
+        async with httpx.AsyncClient(timeout=10, trust_env=False) as client:
             r = await client.post(
                 f"{self.base_url}/api/show",
                 json={"model": name},
@@ -46,7 +58,7 @@ class OllamaService:
 
     async def pull_model(self, name: str) -> AsyncIterator[dict]:
         """POST /api/pull — 拉取模型（流式进度）"""
-        async with httpx.AsyncClient(timeout=600) as client:
+        async with httpx.AsyncClient(timeout=600, trust_env=False) as client:
             async with client.stream(
                 "POST",
                 f"{self.base_url}/api/pull",
@@ -62,7 +74,7 @@ class OllamaService:
 
     async def delete_model(self, name: str) -> None:
         """DELETE /api/delete — 删除模型"""
-        async with httpx.AsyncClient(timeout=10) as client:
+        async with httpx.AsyncClient(timeout=10, trust_env=False) as client:
             r = await client.request(
                 "DELETE",
                 f"{self.base_url}/api/delete",
@@ -72,14 +84,14 @@ class OllamaService:
 
     async def running_models(self) -> list:
         """GET /api/ps — 获取运行中的模型"""
-        async with httpx.AsyncClient(timeout=10) as client:
+        async with httpx.AsyncClient(timeout=10, trust_env=False) as client:
             r = await client.get(f"{self.base_url}/api/ps")
             r.raise_for_status()
             return r.json().get("models", [])
 
     async def copy_model(self, source: str, destination: str) -> None:
         """POST /api/copy — 复制模型（创建别名/标签）"""
-        async with httpx.AsyncClient(timeout=30) as client:
+        async with httpx.AsyncClient(timeout=30, trust_env=False) as client:
             r = await client.post(
                 f"{self.base_url}/api/copy",
                 json={"source": source, "destination": destination},
@@ -88,7 +100,7 @@ class OllamaService:
 
     async def get_version(self) -> str:
         """GET /api/version — 获取 Ollama 版本"""
-        async with httpx.AsyncClient(timeout=5) as client:
+        async with httpx.AsyncClient(timeout=5, trust_env=False) as client:
             r = await client.get(f"{self.base_url}/api/version")
             r.raise_for_status()
             return r.json().get("version", "unknown")
@@ -99,7 +111,7 @@ class OllamaService:
 
     async def chat_stream(self, model: str, messages: list) -> AsyncIterator[str]:
         """POST /api/chat — 流式对话"""
-        async with httpx.AsyncClient(timeout=120) as client:
+        async with httpx.AsyncClient(timeout=120, trust_env=False) as client:
             async with client.stream(
                 "POST",
                 f"{self.base_url}/api/chat",
@@ -118,17 +130,20 @@ class OllamaService:
 
     async def generate(self, model: str, prompt: str, stream: bool = False) -> str:
         """POST /api/generate — 文本生成（非流式）"""
-        async with httpx.AsyncClient(timeout=120) as client:
+        async with httpx.AsyncClient(timeout=120, trust_env=False) as client:
             r = await client.post(
                 f"{self.base_url}/api/generate",
                 json={"model": model, "prompt": prompt, "stream": stream},
             )
-            r.raise_for_status()
+            try:
+                r.raise_for_status()
+            except httpx.HTTPStatusError as e:
+                raise RuntimeError(_extract_ollama_error(e.response)) from e
             return r.json().get("response", "")
 
     async def embed(self, model: str, input_text: str) -> list:
         """POST /api/embed — 生成 Embedding"""
-        async with httpx.AsyncClient(timeout=30) as client:
+        async with httpx.AsyncClient(timeout=30, trust_env=False) as client:
             r = await client.post(
                 f"{self.base_url}/api/embed",
                 json={"model": model, "input": input_text},
@@ -143,7 +158,7 @@ class OllamaService:
     async def check_health(self) -> bool:
         """检查 Ollama 是否在线"""
         try:
-            async with httpx.AsyncClient(timeout=3) as client:
+            async with httpx.AsyncClient(timeout=3, trust_env=False) as client:
                 r = await client.get(f"{self.base_url}/api/version")
                 return r.status_code == 200
         except Exception:

@@ -82,10 +82,10 @@
 
 | 接口类型 | 当前状态 | 完整版需补充 |
 |---------|---------|------------|
-| ① HA 设备控制（POST /api/services） | ❌ Mock（TODO_REAL_ENDPOINT） | 替换 `02` 的占位为真实 HA API |
-| ② HA 状态查询（GET /api/states） | ❌ 缺失 | 在 `02` 或单独 Workflow 加"状态查询"分支 |
+| ① HA 设备控制（平台后端代理） | 🔍 待交付环境验证 | `02` 已通过 `/api/v1/devices/search` 与 `/api/v1/devices/{entity_id}/control` 调用后端，再由后端控制 HA |
+| ② HA 状态/历史查询（平台后端代理） | 🔍 待交付环境验证 | `04` 已通过 `/api/v1/monitor/agent-query` 查询实时状态、历史趋势和服务健康 |
 | ③ RAG 知识库检索 | ⚠️ 架构有，未绑真实知识库 | 在 `03` 绑定知识库并上传真实文档 |
-| ④ 文件处理 或 InfluxDB 数据查询 | ❌ Mock | 替换 `04` 的 LLM Mock 为真实数据源查询 |
+| ④ 文件处理 或 InfluxDB 数据查询 | 🛠️ 待扩展 | 当前先覆盖 HA/监控数据查询；如验收要求文件处理或 InfluxDB 专项，后续补专用 Workflow |
 
 验收截图需要展示：工具列表（4 种工具）+ Agent 执行过程 + 每种接口的调用日志。
 
@@ -195,12 +195,12 @@ sensor.temperature_bedroom     # 卧室温度
 climate.air_conditioner        # 空调
 ```
 
-**Dify `02` 子流程替换占位符示例：**
+**Dify `02` 子流程后端代理配置示例：**
 ```
-TODO_REAL_ENDPOINT
-→ http://localhost:8123/api/services/light/turn_on
-  Header: Authorization: Bearer <HA_LONG_LIVED_TOKEN>
-  Body:   {"entity_id": "light.living_room_light"}
+BACKEND_BASE_URL=http://localhost:8000
+AGENT_API_KEY=<由环境变量或系统设置注入>
+GET  /api/v1/devices/search
+POST /api/v1/devices/{entity_id}/control
 ```
 
 ### 5.3 Web 管理平台职责划分
@@ -283,8 +283,8 @@ homeassistant:
 
 ### 第二步：Dify 接真实 HA 接口，打通 ▲14（预计 1 周）
 
-6. 替换 `02` 的 `TODO_REAL_ENDPOINT` → 真实 HA REST API（控制：POST /api/services）
-7. 在 `02` 增加"状态查询"分支（GET /api/states/{entity_id}）
+6. 在交付 Dify 环境配置 `BACKEND_BASE_URL` 与 `AGENT_API_KEY`，验证 `02` 控制链路。
+7. 验证 `04` 的 `/api/v1/monitor/agent-query` 实时状态、历史趋势和服务健康查询。
 8. `03` 绑定真实知识库，上传小米设备手册等文档（同时覆盖条款 32/33/34）
 9. `04` 接真实数据源：HA history API 或 InfluxDB 查询（Code 节点执行 Python）
 10. 跑 `05` 冒烟测试，截图 4 种接口的调用日志（▲14 验收证据）

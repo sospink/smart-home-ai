@@ -1,0 +1,20 @@
+[Unit]
+Description=Smart Home Frontend
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=__REMOTE_ROOT__/current/frontend
+EnvironmentFile=__REMOTE_ROOT__/shared/frontend.env
+ExecStart=/usr/bin/bash -lc 'exec /usr/bin/env node server.js'
+Restart=always
+RestartSec=5
+KillSignal=SIGINT
+TimeoutStopSec=30
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

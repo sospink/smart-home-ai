@@ -1,5 +1,5 @@
 app:
-  description: 知识问答子 Workflow（RAG）
+  description: 知识问答子 Workflow（RAG，导入交付环境后必须绑定真实 dataset 并保存命中证据）
   icon: "📚"
   icon_background: '#DCFCE7'
   mode: workflow
@@ -176,7 +176,7 @@ workflow:
       width: 242
     - data:
         dataset_ids: []
-        desc: 知识库检索（导入后手动绑定 dataset）
+        desc: 知识库检索（模板保持 dataset_ids 为空；导入交付环境后手动绑定真实 dataset，验收需保存 dataset ID、命中文档片段和 Dify 运行记录）
         multiple_retrieval_config:
           reranking_enable: false
           reranking_mode: reranking_model

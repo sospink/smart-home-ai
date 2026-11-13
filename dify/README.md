@@ -1,81 +1,80 @@
-# Dify 架构重构模板（按“主 Chatflow + 子 Workflow”）
+# Dify 统一 Chatflow 模板
 
 目录：`/Users/zyh/Work/AI/project/smart-home/project/dify`
 
-## 架构（完全对应你的调研文档）
+## 推荐运行方式
 
-用户输入（唯一对话窗口）
-→ `01_main_orchestrator_chatflow.yml`（主 Chatflow 意图识别 + 路由）
-- 意图=控制设备 → `02_home_control_workflow.yml`
-- 意图=知识问答 → `03_rag_qa_workflow.yml`
-- 意图=数据查询 → `04_data_analysis_workflow.yml`
-→ 汇总结果返回用户
+当前交付主路径已经收口为一个最终 Dify 智能体：
 
-`05_orchestration_smoke_test_workflow.yml` 用于联调与验收，不是主业务入口。
+- 本地 Dify 控制台：`http://192.168.251.190/app/d869d903-fd1f-4b24-890e-0fd7bb1ed60b/workflow`
+- App ID：`d869d903-fd1f-4b24-890e-0fd7bb1ed60b`
+- 模型：本地 Dify 已配置的千问 `qwen3-max`。
+- Home Assistant：由平台后端连接 `http://192.168.251.190:8123`；HA Token 不进入 Dify DSL。
+- 应用 API Key：在平台 `/agents` 的该智能体详情中填写，文档和仓库不保存明文。
+
+平台 `/chat`、`/agents` 测试运行和运行记录优先调用 `/agents` 中标记为“当前使用”的 Dify 智能体；系统设置里的 Dify 应用 API Key 仅作为兼容兜底。
+
+## 模板导入方式
+
+当前部署和交付主路径使用以下单体 Chatflow 模板：
+
+`00 Smart Home Unified Chatflow.yml`
+
+该单体 Chatflow 内置四条主链路：
+
+- 控制设备：解析控制意图，调用平台 `/api/v1/devices/search` 与 `/api/v1/devices/{entity_id}/control`。
+- 知识问答：使用 Dify 知识库检索节点，导入后在控制台绑定真实 dataset。
+- 数据查询：调用平台 `/api/v1/monitor/agent-query`，返回 `query_type`、`source_endpoint`、`data_source`、`fallback_note` 与查询结果摘要。
+- 兜底问答：提示用户可继续使用设备控制、知识问答和数据查询能力。
+
+## 导入后配置
+
+导入 `00 Smart Home Unified Chatflow.yml` 后，只需要在 Dify 应用编排页完成以下配置：
+
+1. 打开右上角“变量”或画布底部变量面板，确认应用级环境变量 `BACKEND_BASE_URL` 和 `AGENT_API_KEY` 已存在。
+2. 将 `BACKEND_BASE_URL` 设置为 Dify 可访问的平台后端地址。本地联调使用 `http://192.168.251.4:8000`，不能填写 Dify 容器自身的 `localhost:8000`。
+3. 将 `AGENT_API_KEY` 设置为平台 Agent 代理调用密钥；该变量类型为 `secret`，不要写入 DSL 或文档。
+4. 在“知识库检索”节点绑定真实知识库 dataset。
+5. 发布应用，并在平台 `/agents` 中填写该 Dify App ID、聊天或控制台地址、应用 API Key，并设为当前运行智能体。
+
+节点中通过 `{{#env.BACKEND_BASE_URL#}}` 和 `{{#env.AGENT_API_KEY#}}` 引用上述变量。它们是 Dify 应用级环境变量，不是 Dify Docker `.env` 容器环境变量。
+
+单体模板不需要配置旧版家居控制、RAG、数据分析三个子流程 App Key。
 
 ## 文件清单
 
-1. `01 Main Orchestrator Chatflow.yml`（主入口，唯一对话窗口，推荐导入）
-2. `01_main_orchestrator_chatflow.yml`（与上面同内容的兼容命名版）
-3. `02_home_control_workflow.yml`（家居控制子流程，当前 Mock）
-4. `03_rag_qa_workflow.yml`（RAG 子流程，dataset_ids 留空占位）
-5. `04_data_analysis_workflow.yml`（数据分析子流程，当前 Mock）
-6. `05_orchestration_smoke_test_workflow.yml`（架构联调检查）
-7. `kb-seed/`（可直接上传到知识库的初始化文档）
+1. `00 Smart Home Unified Chatflow.yml`：正式推荐单 DSL 入口。
+2. `01 Main Orchestrator Chatflow.yml`：历史拆分版主 Chatflow。
+3. `02_home_control_workflow.yml`：历史拆分版家居控制 Workflow。
+4. `03_rag_qa_workflow.yml`：历史拆分版 RAG Workflow。
+5. `04_data_analysis_workflow.yml`：历史拆分版数据分析 Workflow。
+6. `05_orchestration_smoke_test_workflow.yml`：历史拆分版联调检查 Workflow。
+7. `kb-seed/`：可上传到知识库的初始化文档。
 
-## 高阶画布升级（已内置）
+旧 01-05 文件保留用于架构参考、单独联调和历史证据追溯；正式业务运行以 `/agents` 当前默认 Dify 智能体为准。
 
-- `01`：新增“查询增强”节点 + 子流程结果产品化节点（控制/RAG/数据）。
-- `02`：新增“执行策略评估”与“客户可读回执”节点。
-- `03`：新增“命中结果优化”与“未命中补库建议”节点。
-- `04`：新增“数据质检”与“高管摘要”节点。
-- `05`：新增“测试样例生成”与“验收评分”节点。
+## 冒烟验证
 
-## 你“主要调用哪个”？
+在 `00 Smart Home Unified Chatflow` 中依次测试：
 
-- 对外主调用：**只调 `01_main_orchestrator_chatflow.yml`**。
-- 其余 02/03/04 是被主流程自动调用的子能力模板（HTTP Request 调 Dify Workflow API）。
-
-## 导入顺序
-
-`02 -> 03 -> 04 -> 05 -> 01`
-
-## 当前阶段说明（你要求的）
-
-- 第一阶段不接 Home Assistant、虚拟设备。
-- `02`/`04` 里保留 `TODO_REAL_ENDPOINT` 作为第二阶段替换位。
-- `03` 的 `dataset_ids` 为空，导入后在 Dify 里绑定知识库。
-- `01/02/03/04` 中的 `user_id/session_id/context` 已设为隐藏预留字段，不影响预览测试。
-
-## `01` 自动调用版必配项
-
-在 `01_main_orchestrator_chatflow` 里有 3 个 HTTP Request 节点（调用控制/RAG/数据子流程），需要把以下占位符改成真实值：
-
-- `http://TODO_DIFY_HOST:3000/v1/workflows/run`
-  - 改成你的 Dify 地址，例如：`http://192.168.1.10:3000/v1/workflows/run`
-- `Authorization: Bearer TODO_API_KEY_02`
-  - 改成 `02_home_control_workflow` 的 API Key（`app-...`）
-- `Authorization: Bearer TODO_API_KEY_03`
-  - 改成 `03_rag_qa_workflow` 的 API Key（`app-...`）
-- `Authorization: Bearer TODO_API_KEY_04`
-  - 改成 `04_data_analysis_workflow` 的 API Key（`app-...`）
-
-说明：主入口会先调用子流程 `/v1/workflows/run`，再将响应清洗为用户可读文本后返回（不直接展示 JSON 原包）。
+1. `根据知识库回答：系统支持哪些核心能力？`
+   - 预期：进入知识问答分支，命中已绑定 dataset 时返回结论、依据和建议下一步。
+2. `查询当前室内温度和最近 24 小时趋势`
+   - 预期：进入数据查询分支，回答包含 `source_endpoint`、`data_source` 和趋势摘要。
+3. `查询当前系统服务状态`
+   - 预期：进入数据查询分支，回答服务名称、运行状态和延迟，不输出无关历史趋势。
+4. `查询筒灯当前状态`
+   - 预期：进入数据查询分支，从平台动态设备台账定位真实 HA 实体并返回 HA 当前状态。
 
 ## 合同映射
 
-- 13/15/17/18/30：`01`
-- ▲14（4类接口能力预埋）：`02` + `04` + `05`
-- 31-35：`03`
-- 25/26/27（模板库与可扩展）：整套 5 个模板
+- 13/15/17/18/30：`00` 统一 Chatflow 和平台 `/agents` 绑定。
+- ▲14：`00` 内置设备控制、知识问答、数据查询和系统状态接口能力。
+- 31-35：`00` 的知识库检索节点与真实 dataset 绑定。
+- 25/26/27：`00` 推荐模板 + 旧 01-05 历史拆分模板说明。
 
-## 冒烟验证（最短路径）
+## 运行记录口径
 
-1. 在 `01` 输入：`打开客厅灯`
-- 预期：执行到“调用控制子流程”节点，最终返回 `02` 的 workflow API 响应
-
-2. 在 `01` 输入：`根据知识库回答：系统支持哪些能力`
-- 预期：执行到“调用RAG子流程”节点，最终返回 `03` 的 workflow API 响应
-
-3. 在 `01` 输入：`查询最近7天趋势`
-- 预期：执行到“调用数据子流程”节点，最终返回 `04` 的 workflow API 响应
+- 平台主实例绑定一个 Dify App ID 和一个应用 API Key 即可，不再维护多个子 Workflow App Key。
+- `/chat`、`/agents`、`/conversation-records` 后续围绕当前默认 Dify 智能体复测。
+- 旧多 App `workflow_run_id` 和截图证据保留为阶段记录，不作为下一轮主路径。

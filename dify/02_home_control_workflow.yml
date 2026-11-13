@@ -189,26 +189,29 @@ workflow:
           text: |
             你是智能家居控制意图解析器。将用户的自然语言指令解析为 JSON。
 
-            可用设备列表：
-            - 客厅灯（灯光，支持 turn_on / turn_off）
-            - 卧室灯（灯光，支持 turn_on / turn_off）
-            - 书房灯（灯光，支持 turn_on / turn_off）
-            - 主卧空调（空调，支持 turn_on / turn_off）
-            - 咖啡机（开关，支持 turn_on / turn_off）
-            - 热水器（开关，支持 turn_on / turn_off）
-            - 前门门锁（安防，支持 turn_on=锁定 / turn_off=解锁）
+            设备名称来自平台动态台账，不要假设固定房间或固定实体 ID。
+            可用动作包括 turn_on、turn_off、toggle、lock、unlock、open_cover、
+            close_cover、stop_cover、set_brightness、set_color_temperature、
+            set_position、set_temperature、set_hvac_mode、set_percentage、
+            set_value、select_option、set_effect。只有用户明确表达目标值时才使用 set_* 动作。
 
             只输出 JSON，格式如下：
             {
               "device_name": "客厅灯",
               "action": "turn_on",
+              "value": null,
               "confidence": 0.95
             }
+
+            需要目标值时必须填写 value，例如：
+            {"device_name":"筒灯","action":"set_brightness","value":50,"confidence":0.95}
+            {"device_name":"空调","action":"set_temperature","value":24,"confidence":0.95}
 
             如果无法识别设备或操作，返回：
             {
               "device_name": null,
               "action": null,
+              "value": null,
               "confidence": 0,
               "error": "无法识别的指令"
             }
@@ -242,7 +245,7 @@ workflow:
           import re
 
           def main(llm_output: str) -> dict:
-              """从 LLM 输出中提取 device_name 和 action"""
+              """从 LLM 输出中提取设备、动作和平台控制数据。"""
               try:
                   # 尝试提取 JSON 块
                   json_match = re.search(r'\{[^}]+\}', llm_output, re.DOTALL)
@@ -253,13 +256,29 @@ workflow:
 
                   device_name = parsed.get("device_name", "")
                   action = parsed.get("action", "turn_on")
+                  value = parsed.get("value")
 
                   if not device_name:
-                      return {"device_name": "", "action": "", "error": "无法识别设备"}
+                      return {"device_name": "", "action": "", "data_json": "{}", "error": "无法识别设备"}
 
-                  return {"device_name": device_name, "action": action, "error": ""}
+                  data_keys = {
+                      "set_brightness": "brightness_pct",
+                      "set_color_temperature": "color_temp_kelvin",
+                      "set_position": "position",
+                      "set_temperature": "temperature",
+                      "set_hvac_mode": "hvac_mode",
+                      "set_percentage": "percentage",
+                      "set_value": "value",
+                      "select_option": "option",
+                      "set_effect": "effect",
+                  }
+                  if action in data_keys and value is None:
+                      return {"device_name": device_name, "action": action, "data_json": "{}", "error": "控制指令缺少目标值"}
+                  control_data = {data_keys[action]: value} if action in data_keys else {}
+
+                  return {"device_name": device_name, "action": action, "data_json": json.dumps(control_data, ensure_ascii=False), "error": ""}
               except Exception as e:
-                  return {"device_name": "", "action": "", "error": str(e)}
+                  return {"device_name": "", "action": "", "data_json": "{}", "error": str(e)}
         code_language: python3
         desc: 从 LLM JSON 输出中提取 device_name 和 action
         outputs:
@@ -267,6 +286,9 @@ workflow:
             children: null
             type: string
           action:
+            children: null
+            type: string
+          data_json:
             children: null
             type: string
           error:
@@ -302,10 +324,12 @@ workflow:
         body:
           data: ''
           type: none
-        desc: 调用 FastAPI /devices/search 获取 entity_id
-        headers: 'X-Agent-Key:sk-smart-home-agent-2026'
+        desc: 按名称和动作查询平台动态设备台账
+        headers: 'X-Agent-Key:{{AGENT_API_KEY}}'
         method: get
-        params: 'name:{{#code_extract.device_name#}}'
+        params: 'name:{{#code_extract.device_name#}}
+
+          action:{{#code_extract.action#}}'
         retry_config:
           max_retries: 2
           retry_enabled: true
@@ -318,7 +342,7 @@ workflow:
           max_write_timeout: 10
         title: 搜索设备
         type: http-request
-        url: http://172.18.22.66:8000/api/v1/devices/search
+        url: '{{BACKEND_BASE_URL}}/api/v1/devices/search'
         variables: []
       height: 136
       id: http_search
@@ -340,32 +364,38 @@ workflow:
           import json
 
           def main(search_body: str, action: str) -> dict:
-              """从搜索结果提取 entity_id，构建控制 URL"""
+              """从搜索结果提取平台设备 ID 和映射角色。"""
               try:
                   data = json.loads(search_body)
                   devices = data.get("devices", [])
                   if not devices:
-                      return {"entity_id": "", "control_url": "", "error": "设备未找到"}
+                      return {"entity_id": "", "role": "", "control_url": "", "error": "设备未找到"}
 
                   device = devices[0]
                   entity_id = device.get("main_entity_id", "")
+                  device_id = device.get("device_id", "")
+                  role = device.get("main_role", "")
                   device_name = device.get("name", "")
 
-                  control_url = f"http://172.18.22.66:8000/api/v1/devices/{entity_id}/control"
+                  control_url = f"/api/v1/devices/{device_id}/control"
 
                   return {
                       "entity_id": entity_id,
+                      "role": role,
                       "device_name": device_name,
                       "control_url": control_url,
                       "action": action,
                       "error": ""
                   }
               except Exception as e:
-                  return {"entity_id": "", "control_url": "", "error": str(e)}
+                  return {"entity_id": "", "role": "", "control_url": "", "error": str(e)}
         code_language: python3
         desc: 从搜索结果构建控制 URL 和请求体
         outputs:
           entity_id:
+            children: null
+            type: string
+          role:
             children: null
             type: string
           device_name:
@@ -416,10 +446,10 @@ workflow:
           - id: control-body
             key: ''
             type: text
-            value: '{"service":"{{#code_build_control.action#}}"}'
+            value: '{"service":"{{#code_build_control.action#}}","role":"{{#code_build_control.role#}}","data":{{#code_extract.data_json#}}}'
           type: raw-text
-        desc: 调用 FastAPI /devices/{entity_id}/control 真实控制 HA
-        headers: 'X-Agent-Key:sk-smart-home-agent-2026
+        desc: 通过平台设备 ID 和映射角色真实控制 HA
+        headers: 'X-Agent-Key:{{AGENT_API_KEY}}
 
           Content-Type:application/json'
         method: post
@@ -436,7 +466,7 @@ workflow:
           max_write_timeout: 10
         title: 控制设备
         type: http-request
-        url: '{{#code_build_control.control_url#}}'
+        url: '{{BACKEND_BASE_URL}}{{#code_build_control.control_url#}}'
         variables: []
       height: 136
       id: http_control
@@ -479,10 +509,11 @@ workflow:
             你是智能家居控制助手。根据设备控制的执行结果，生成简洁友好的中文回复。
 
             规则：
-            1. 如果 success=true，回复格式："已为您{动作}{设备名} ✅"
-            2. 如果失败，说明原因并建议重试
-            3. 不要输出 JSON，只输出自然语言
-            4. 回复要简洁，一两句话即可
+            1. 如果 confirmation=physical_pending，只能回复“控制命令已由 Home Assistant 接受，物理设备是否动作仍需现场确认”，禁止说“已打开”“已关闭”或“执行成功”
+            2. 如果 confirmation=confirmed，才可以回复 Home Assistant 回读已确认
+            3. 如果失败，说明原因并建议重试
+            4. 不要输出 JSON，只输出自然语言
+            5. 回复要简洁，一两句话即可
         - id: present-user
           role: user
           text: |

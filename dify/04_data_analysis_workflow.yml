@@ -1,5 +1,5 @@
 app:
-  description: 数据分析子 Workflow（第一阶段 LLM Mock，后续替换 InfluxDB/PG）
+  description: 数据分析子 Workflow（调用平台后端真实监控/历史数据接口）
   icon: "📈"
   icon_background: '#FEF3C7'
   mode: workflow
@@ -67,18 +67,18 @@ workflow:
       type: custom
     - data:
         sourceType: llm
-        targetType: llm
-      id: extract-to-mock
+        targetType: http-request
+      id: extract-to-data-query
       source: llm_extract
       sourceHandle: source
-      target: llm_mock_data
+      target: http_data_query
       targetHandle: target
       type: custom
     - data:
-        sourceType: llm
+        sourceType: http-request
         targetType: llm
-      id: mock-to-quality
-      source: llm_mock_data
+      id: data-query-to-quality
+      source: http_data_query
       sourceHandle: source
       target: llm_quality
       targetHandle: target
@@ -182,10 +182,11 @@ workflow:
           text: |
             输出JSON：
             {
-              "metric":"...",
-              "time_range":"...",
-              "group_by":"...",
-              "filters":{}
+              "metric":"temperature|humidity|pm25|services|device",
+              "query_type":"auto|realtime|device_history|sensor_history|services",
+              "entity_id":"",
+              "hours":24,
+              "time_range":"..."
             }
             只输出JSON。
         - id: extract-user
@@ -211,49 +212,34 @@ workflow:
       type: custom
       width: 242
     - data:
-        context:
-          enabled: false
-        desc: 生成 Mock 数据
-        memory:
-          role_prefix:
-            assistant: ''
-            user: ''
-          window:
-            enabled: false
-            size: 5
-        model:
-          completion_params:
-            max_tokens: 320
-            temperature: 0.1
-            top_p: 0.9
-          mode: chat
-          name: qwen3-max
-          provider: langgenius/tongyi/tongyi
-        prompt_template:
-        - id: mock-system
-          role: system
-          text: |
-            你是数据查询Mock节点。输出JSON：
-            {
-              "status":"success",
-              "message":"data_query_mock_ok",
-              "payload":{
-                "rows":[{"time":"2026-03-01","value":128},{"time":"2026-03-02","value":132},{"time":"2026-03-03","value":125}],
-                "replace_hint":"TODO_REAL_ENDPOINT"
-              },
-              "trace_id":"..."
-            }
-        - id: mock-user
-          role: user
-          text: "{{#llm_extract.text#}}"
+        authorization:
+          config: null
+          type: no-auth
+        body:
+          data: ''
+          type: none
+        desc: 调用平台后端 /monitor/agent-query，读取 HA 实时状态、历史趋势或服务健康数据
+        headers: 'X-Agent-Key:{{AGENT_API_KEY}}'
+        method: get
+        params: 'query:{{#start_node.query#}}
+
+          metric:{{#llm_extract.text#}}'
+        retry_config:
+          max_retries: 2
+          retry_enabled: true
+          retry_interval: 1000
         selected: false
-        title: 数据Mock
-        type: llm
+        ssl_verify: false
+        timeout:
+          max_connect_timeout: 10
+          max_read_timeout: 20
+          max_write_timeout: 10
+        title: 真实数据查询
+        type: http-request
+        url: '{{BACKEND_BASE_URL}}/api/v1/monitor/agent-query'
         variables: []
-        vision:
-          enabled: false
       height: 132
-      id: llm_mock_data
+      id: http_data_query
       position:
         x: 680
         y: 300
@@ -297,7 +283,7 @@ workflow:
             仅输出JSON。
         - id: quality-user
           role: user
-          text: "{{#llm_mock_data.text#}}"
+          text: "{{#http_data_query.body#}}"
         selected: false
         title: 数据质检
         type: llm
@@ -350,7 +336,7 @@ workflow:
         - id: report-user
           role: user
           text: |
-            mock_data={{#llm_mock_data.text#}}
+            real_data={{#http_data_query.body#}}
             quality={{#llm_quality.text#}}
         selected: false
         title: 报告生成

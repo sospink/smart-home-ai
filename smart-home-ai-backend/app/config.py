@@ -1,5 +1,5 @@
 """
-应用配置 — 优先从 config.yaml 读取，回退到 .env / 环境变量
+应用配置 — 优先级：显式环境变量 > .env > config.yaml > 代码默认值
 """
 from pathlib import Path
 from typing import List
@@ -77,8 +77,15 @@ def _load_yaml_config() -> dict:
     return flat
 
 
-# 先加载 YAML，作为初始值传给 Settings
+# 先加载 YAML，作为低优先级配置源；真实凭证应放在本地 .env 或系统环境变量中。
 _yaml_values = _load_yaml_config()
+
+
+def _yaml_settings_source() -> dict:
+    return {
+        key: value for key, value in _yaml_values.items()
+        if key in Settings.model_fields
+    }
 
 
 class Settings(BaseSettings):
@@ -92,9 +99,9 @@ class Settings(BaseSettings):
 
     # ── 外部服务 ──
     OLLAMA_BASE_URL: str = "http://localhost:11434"
-    HA_BASE_URL: str = "http://localhost:8123"
+    HA_BASE_URL: str = "http://192.168.34.190:8123"
     HA_TOKEN: str = ""
-    DIFY_BASE_URL: str = "http://localhost:5001"
+    DIFY_BASE_URL: str = "http://192.168.34.190"
     DIFY_API_KEY: str = ""
     DIFY_DATASET_API_KEY: str = ""
     INFLUXDB_URL: str = "http://localhost:8086"
@@ -106,15 +113,26 @@ class Settings(BaseSettings):
     AGENT_API_KEY: str = "sk-smart-home-agent-2026"
 
     # ── CORS ──
-    CORS_ORIGINS: List[str] = ["http://localhost:3000", "http://localhost:3100"]
+    CORS_ORIGINS: List[str] = ["http://localhost:3000", "http://localhost:8088"]
 
-    model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
+    model_config = {"env_file": ".env", "env_file_encoding": "utf-8", "extra": "ignore"}
+
+    @classmethod
+    def settings_customise_sources(
+        cls,
+        settings_cls,
+        init_settings,
+        env_settings,
+        dotenv_settings,
+        file_secret_settings,
+    ):
+        return (
+            init_settings,
+            env_settings,
+            dotenv_settings,
+            _yaml_settings_source,
+            file_secret_settings,
+        )
 
 
-# 优先级：环境变量 > .env > config.yaml > 代码默认值
-# pydantic-settings 自动处理 环境变量 > .env > 默认值
-# 我们把 yaml 值注入为默认值的覆盖
-settings = Settings(**{
-    k: v for k, v in _yaml_values.items()
-    if k in Settings.model_fields
-})
+settings = Settings()

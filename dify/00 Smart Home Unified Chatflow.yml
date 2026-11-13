@@ -1,0 +1,1485 @@
+app:
+  description: 智慧家居统一对话流（单 DSL 正式入口），内嵌设备控制、知识问答、数据查询和兜底问答能力。
+  icon: ''
+  icon_background: '#DBEAFE'
+  mode: advanced-chat
+  name: 00 Smart Home Unified Chatflow
+  use_icon_as_answer_icon: true
+dependencies:
+- current_identifier: null
+  type: marketplace
+  value:
+    marketplace_plugin_unique_identifier: langgenius/tongyi:0.1.19@12ddda76bb473f9beb52d2ea2a67412d54924f93a29465fffb8635ba62b409c3
+    version: null
+kind: app
+version: 0.5.0
+workflow:
+  conversation_variables: []
+  environment_variables:
+  - description: 平台后端基础地址；本地 Dify 需使用开发机局域网地址，不能使用容器内 localhost，不带结尾斜杠。
+    id: 8e189df1-7a0e-45c8-a27d-42c7fb9a6f00
+    name: BACKEND_BASE_URL
+    selector:
+    - env
+    - BACKEND_BASE_URL
+    value: http://192.168.251.4:8000
+    value_type: string
+  - description: 平台 Agent 代理调用密钥，对应后端运行时配置中的 Agent API Key。
+    id: b954596d-1f18-45c7-9446-7a56f48b6322
+    name: AGENT_API_KEY
+    selector:
+    - env
+    - AGENT_API_KEY
+    value: ''
+    value_type: secret
+  features:
+    file_upload:
+      allowed_file_extensions:
+      - .PDF
+      - .MD
+      - .TXT
+      allowed_file_types:
+      - document
+      allowed_file_upload_methods:
+      - local_file
+      - remote_url
+      enabled: true
+      fileUploadConfig:
+        audio_file_size_limit: 50
+        batch_count_limit: 5
+        file_size_limit: 15
+        image_file_batch_limit: 10
+        image_file_size_limit: 10
+        single_chunk_attachment_limit: 10
+        video_file_size_limit: 100
+        workflow_file_upload_limit: 10
+      image:
+        enabled: false
+        number_limits: 3
+        transfer_methods:
+        - local_file
+        - remote_url
+      number_limits: 3
+    opening_statement: '你好，我是智慧家居统一智能体。
+
+      我可以在同一个应用内完成：家居控制、知识问答、数据查询和系统状态查询。
+
+      '
+    retriever_resource:
+      enabled: false
+    sensitive_word_avoidance:
+      enabled: false
+    speech_to_text:
+      enabled: false
+    suggested_questions:
+    - 查询筒灯当前状态
+    - 根据知识库回答：系统支持哪些核心能力？
+    - 查询当前室内温度和最近 24 小时趋势
+    - 查询当前系统服务状态
+    suggested_questions_after_answer:
+      enabled: true
+    text_to_speech:
+      enabled: false
+      language: ''
+      voice: ''
+  graph:
+    edges:
+    - data:
+        sourceType: start
+        targetType: llm
+      id: start-to-enhance
+      source: start_node
+      sourceHandle: source
+      target: llm_query_enhance
+      targetHandle: target
+      type: custom
+    - data:
+        sourceType: llm
+        targetType: question-classifier
+      id: enhance-to-classifier
+      source: llm_query_enhance
+      sourceHandle: source
+      target: intent_classifier
+      targetHandle: target
+      type: custom
+    - data:
+        sourceType: question-classifier
+        targetType: llm
+      id: cls-to-control-parse
+      source: intent_classifier
+      sourceHandle: class_control
+      target: control_parse
+      targetHandle: target
+      type: custom
+    - data:
+        sourceType: llm
+        targetType: code
+      id: control-parse-to-code
+      source: control_parse
+      sourceHandle: source
+      target: control_extract
+      targetHandle: target
+      type: custom
+    - data:
+        sourceType: code
+        targetType: http-request
+      id: control-code-to-search
+      source: control_extract
+      sourceHandle: source
+      target: control_search_device
+      targetHandle: target
+      type: custom
+    - data:
+        sourceType: http-request
+        targetType: code
+      id: control-search-to-build
+      source: control_search_device
+      sourceHandle: source
+      target: control_build_request
+      targetHandle: target
+      type: custom
+    - data:
+        sourceType: code
+        targetType: http-request
+      id: control-build-to-execute
+      source: control_build_request
+      sourceHandle: source
+      target: control_execute
+      targetHandle: target
+      type: custom
+    - data:
+        sourceType: http-request
+        targetType: llm
+      id: control-execute-to-present
+      source: control_execute
+      sourceHandle: source
+      target: control_present
+      targetHandle: target
+      type: custom
+    - data:
+        sourceType: llm
+        targetType: answer
+      id: control-present-to-answer
+      source: control_present
+      sourceHandle: source
+      target: answer_control
+      targetHandle: target
+      type: custom
+    - data:
+        sourceType: question-classifier
+        targetType: knowledge-retrieval
+      id: cls-to-rag-kb
+      source: intent_classifier
+      sourceHandle: class_rag
+      target: rag_kb
+      targetHandle: target
+      type: custom
+    - data:
+        sourceType: knowledge-retrieval
+        targetType: if-else
+      id: rag-kb-to-if
+      source: rag_kb
+      sourceHandle: source
+      target: rag_has_context
+      targetHandle: target
+      type: custom
+    - data:
+        sourceType: if-else
+        targetType: llm
+      id: rag-if-true-to-hit
+      source: rag_has_context
+      sourceHandle: 'true'
+      target: rag_hit_answer
+      targetHandle: target
+      type: custom
+    - data:
+        sourceType: if-else
+        targetType: llm
+      id: rag-if-false-to-miss
+      source: rag_has_context
+      sourceHandle: 'false'
+      target: rag_miss_answer
+      targetHandle: target
+      type: custom
+    - data:
+        sourceType: llm
+        targetType: llm
+      id: rag-hit-to-polish
+      source: rag_hit_answer
+      sourceHandle: source
+      target: rag_hit_polish
+      targetHandle: target
+      type: custom
+    - data:
+        sourceType: llm
+        targetType: llm
+      id: rag-miss-to-polish
+      source: rag_miss_answer
+      sourceHandle: source
+      target: rag_miss_polish
+      targetHandle: target
+      type: custom
+    - data:
+        sourceType: llm
+        targetType: answer
+      id: rag-polish-hit-to-answer
+      source: rag_hit_polish
+      sourceHandle: source
+      target: answer_rag_hit
+      targetHandle: target
+      type: custom
+    - data:
+        sourceType: llm
+        targetType: answer
+      id: rag-polish-miss-to-answer
+      source: rag_miss_polish
+      sourceHandle: source
+      target: answer_rag_miss
+      targetHandle: target
+      type: custom
+    - data:
+        sourceType: question-classifier
+        targetType: llm
+      id: cls-to-data-extract
+      source: intent_classifier
+      sourceHandle: class_data
+      target: data_extract
+      targetHandle: target
+      type: custom
+    - data:
+        sourceType: llm
+        targetType: http-request
+      id: data-extract-to-query
+      source: data_extract
+      sourceHandle: source
+      target: data_query
+      targetHandle: target
+      type: custom
+    - data:
+        sourceType: http-request
+        targetType: llm
+      id: data-query-to-quality
+      source: data_query
+      sourceHandle: source
+      target: data_quality
+      targetHandle: target
+      type: custom
+    - data:
+        sourceType: llm
+        targetType: llm
+      id: data-quality-to-report
+      source: data_quality
+      sourceHandle: source
+      target: data_report
+      targetHandle: target
+      type: custom
+    - data:
+        sourceType: llm
+        targetType: llm
+      id: data-report-to-present
+      source: data_report
+      sourceHandle: source
+      target: data_present
+      targetHandle: target
+      type: custom
+    - data:
+        sourceType: llm
+        targetType: answer
+      id: data-present-to-answer
+      source: data_present
+      sourceHandle: source
+      target: answer_data
+      targetHandle: target
+      type: custom
+    - data:
+        sourceType: question-classifier
+        targetType: llm
+      id: cls-to-general
+      source: intent_classifier
+      sourceHandle: class_general
+      target: llm_general
+      targetHandle: target
+      type: custom
+    - data:
+        sourceType: llm
+        targetType: answer
+      id: general-to-answer
+      source: llm_general
+      sourceHandle: source
+      target: answer_general
+      targetHandle: target
+      type: custom
+    nodes:
+    - data:
+        desc: 唯一入口，收敛会话上下文
+        selected: false
+        title: 开始
+        type: start
+        variables:
+        - hide: true
+          label: user_id
+          max_length: 128
+          options: []
+          required: false
+          type: text-input
+          variable: user_id
+        - hide: true
+          label: session_id
+          max_length: 128
+          options: []
+          required: false
+          type: text-input
+          variable: session_id
+        - hide: true
+          label: context
+          max_length: 2000
+          options: []
+          required: false
+          type: paragraph
+          variable: context
+      height: 189
+      id: start_node
+      position:
+        x: 80
+        y: 360
+      positionAbsolute:
+        x: 80
+        y: 360
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+    - data:
+        context:
+          enabled: false
+        desc: 对用户问题做规范化与任务标签增强
+        memory:
+          role_prefix:
+            assistant: ''
+            user: ''
+          window:
+            enabled: false
+            size: 5
+        model:
+          completion_params:
+            max_tokens: 180
+            temperature: 0
+            top_p: 0.9
+          mode: chat
+          name: qwen3-max
+          provider: langgenius/tongyi/tongyi
+        prompt_template:
+        - id: enhance-system
+          role: system
+          text: |
+            你是“请求增强器”。
+            将用户原始输入转成更清晰的单句任务描述，补充必要上下文关键词。
+            只输出增强后的文本，不要JSON。
+        - id: enhance-user
+          role: user
+          text: '{{#sys.query#}}'
+        selected: false
+        title: 查询增强
+        type: llm
+        variables: []
+        vision:
+          enabled: false
+      height: 116
+      id: llm_query_enhance
+      position:
+        x: 380
+        y: 360
+      positionAbsolute:
+        x: 380
+        y: 360
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+    - data:
+        classes:
+        - id: class_control
+          name: 控制设备
+        - id: class_rag
+          name: 知识问答
+        - id: class_data
+          name: 数据查询
+        - id: class_general
+          name: 其他问题
+        desc: 单体 Chatflow 意图路由
+        instructions: |
+          分类规则：
+          1) 控制设备：开关、调温、执行动作类请求。示例：打开客厅灯、关闭卧室空调。
+          2) 知识问答：文档、说明、FAQ、概念解释。示例：如何配置工作流、系统支持什么能力。
+          3) 数据查询：趋势、统计、历史、报表、系统服务健康状态。示例：最近24小时趋势、当前系统服务状态。
+          4) 其余归到其他问题。
+          优先级：若出现明确控制动词（打开/关闭/调高/调低/设置）优先判为“控制设备”；若出现“服务、系统、健康、状态、趋势、历史”优先判为“数据查询”。
+        model:
+          completion_params:
+            frequency_penalty: 0
+            max_tokens: 128
+            presence_penalty: 0
+            temperature: 0
+            top_p: 0.9
+          mode: chat
+          name: qwen3-max
+          provider: langgenius/tongyi/tongyi
+        query_variable_selector:
+        - llm_query_enhance
+        - text
+        selected: false
+        title: 意图分类器
+        topics: []
+        type: question-classifier
+        vision:
+          enabled: false
+      height: 290
+      id: intent_classifier
+      position:
+        x: 680
+        y: 320
+      positionAbsolute:
+        x: 680
+        y: 320
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+    - data:
+        context:
+          enabled: false
+        desc: 解析控制意图为结构化 JSON
+        memory:
+          role_prefix:
+            assistant: ''
+            user: ''
+          window:
+            enabled: false
+            size: 5
+        model:
+          completion_params:
+            max_tokens: 300
+            temperature: 0.1
+            top_p: 0.9
+          mode: chat
+          name: qwen3-max
+          provider: langgenius/tongyi/tongyi
+        prompt_template:
+        - id: control-parse-system
+          role: system
+          text: |
+            你是智能家居控制意图解析器。将用户的自然语言指令解析为 JSON。
+            设备名称来自平台动态台账，不要假设固定房间或固定实体 ID。
+            可用动作包括 turn_on、turn_off、toggle、lock、unlock、open_cover、
+            close_cover、stop_cover、set_brightness、set_color_temperature、
+            set_position、set_temperature、set_hvac_mode、set_percentage、
+            set_value、select_option、set_effect。只有用户明确表达目标值时才使用 set_* 动作。
+
+            只输出 JSON，格式如下：
+            {"device_name":"筒灯","action":"turn_on","value":null,"confidence":0.95}
+            需要目标值时必须填写 value，例如：
+            {"device_name":"筒灯","action":"set_brightness","value":50,"confidence":0.95}
+            {"device_name":"空调","action":"set_temperature","value":24,"confidence":0.95}
+            如果无法识别设备或操作，返回：
+            {"device_name":null,"action":null,"value":null,"confidence":0,"error":"无法识别的指令"}
+        - id: control-parse-user
+          role: user
+          text: '{{#sys.query#}}'
+        selected: false
+        title: 控制意图解析
+        type: llm
+        variables: []
+        vision:
+          enabled: false
+      height: 132
+      id: control_parse
+      position:
+        x: 980
+        y: 40
+      positionAbsolute:
+        x: 980
+        y: 40
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+    - data:
+        code: |
+          import json
+          import re
+
+          def main(llm_output: str) -> dict:
+              try:
+                  json_match = re.search(r'\{[^}]+\}', llm_output, re.DOTALL)
+                  parsed = json.loads(json_match.group() if json_match else llm_output)
+                  device_name = parsed.get("device_name") or ""
+                  action = parsed.get("action") or "turn_on"
+                  value = parsed.get("value")
+                  if not device_name:
+                      return {"device_name": "", "action": "", "data_json": "{}", "error": "无法识别设备"}
+                  data_keys = {
+                      "set_brightness": "brightness_pct",
+                      "set_color_temperature": "color_temp_kelvin",
+                      "set_position": "position",
+                      "set_temperature": "temperature",
+                      "set_hvac_mode": "hvac_mode",
+                      "set_percentage": "percentage",
+                      "set_value": "value",
+                      "select_option": "option",
+                      "set_effect": "effect",
+                  }
+                  if action in data_keys and value is None:
+                      return {"device_name": device_name, "action": action, "data_json": "{}", "error": "控制指令缺少目标值"}
+                  control_data = {data_keys[action]: value} if action in data_keys else {}
+                  return {"device_name": device_name, "action": action, "data_json": json.dumps(control_data, ensure_ascii=False), "error": ""}
+              except Exception as exc:
+                  return {"device_name": "", "action": "", "data_json": "{}", "error": str(exc)}
+        code_language: python3
+        desc: 从控制意图 JSON 中提取 device_name 和 action
+        outputs:
+          device_name:
+            children: null
+            type: string
+          action:
+            children: null
+            type: string
+          data_json:
+            children: null
+            type: string
+          error:
+            children: null
+            type: string
+        selected: false
+        title: 控制参数提取
+        type: code
+        variables:
+        - value_selector:
+          - control_parse
+          - text
+          variable: llm_output
+      height: 54
+      id: control_extract
+      position:
+        x: 1280
+        y: 40
+      positionAbsolute:
+        x: 1280
+        y: 40
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+    - data:
+        authorization:
+          config: null
+          type: no-auth
+        body:
+          data: ''
+          type: none
+        desc: 按名称和动作查询平台动态设备台账
+        headers: 'X-Agent-Key:{{#env.AGENT_API_KEY#}}'
+        method: get
+        params: 'name:{{#control_extract.device_name#}}
+
+          action:{{#control_extract.action#}}'
+        retry_config:
+          max_retries: 2
+          retry_enabled: true
+          retry_interval: 1000
+        selected: false
+        ssl_verify: false
+        timeout:
+          max_connect_timeout: 10
+          max_read_timeout: 15
+          max_write_timeout: 10
+        title: 搜索设备
+        type: http-request
+        url: '{{#env.BACKEND_BASE_URL#}}/api/v1/devices/search'
+        variables: []
+      height: 136
+      id: control_search_device
+      position:
+        x: 1580
+        y: 40
+      positionAbsolute:
+        x: 1580
+        y: 40
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+    - data:
+        code: |
+          import json
+
+          def main(search_body: str, action: str) -> dict:
+              try:
+                  data = json.loads(search_body)
+                  devices = data.get("devices", [])
+                  if not devices:
+                      return {"entity_id": "", "role": "", "device_name": "", "control_url": "", "action": action, "error": "设备未找到"}
+                  device = devices[0]
+                  entity_id = device.get("main_entity_id", "")
+                  device_id = device.get("device_id", "")
+                  role = device.get("main_role", "")
+                  device_name = device.get("name", "")
+                  return {
+                      "entity_id": entity_id,
+                      "role": role,
+                      "device_name": device_name,
+                      "control_url": f"/api/v1/devices/{device_id}/control",
+                      "action": action,
+                      "error": ""
+                  }
+              except Exception as exc:
+                  return {"entity_id": "", "role": "", "device_name": "", "control_url": "", "action": action, "error": str(exc)}
+        code_language: python3
+        desc: 从搜索结果构建控制 URL 和请求体
+        outputs:
+          entity_id:
+            children: null
+            type: string
+          role:
+            children: null
+            type: string
+          device_name:
+            children: null
+            type: string
+          control_url:
+            children: null
+            type: string
+          action:
+            children: null
+            type: string
+          error:
+            children: null
+            type: string
+        selected: false
+        title: 构建控制请求
+        type: code
+        variables:
+        - value_selector:
+          - control_search_device
+          - body
+          variable: search_body
+        - value_selector:
+          - control_extract
+          - action
+          variable: action
+      height: 54
+      id: control_build_request
+      position:
+        x: 1880
+        y: 40
+      positionAbsolute:
+        x: 1880
+        y: 40
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+    - data:
+        authorization:
+          config: null
+          type: no-auth
+        body:
+          data:
+          - id: control-body
+            key: ''
+            type: text
+            value: '{"service":"{{#control_build_request.action#}}","role":"{{#control_build_request.role#}}","data":{{#control_extract.data_json#}}}'
+          type: raw-text
+        desc: 通过平台设备 ID 和映射角色控制 HA
+        headers: 'X-Agent-Key:{{#env.AGENT_API_KEY#}}
+
+          Content-Type:application/json'
+        method: post
+        params: ''
+        retry_config:
+          max_retries: 2
+          retry_enabled: true
+          retry_interval: 1000
+        selected: false
+        ssl_verify: false
+        timeout:
+          max_connect_timeout: 10
+          max_read_timeout: 15
+          max_write_timeout: 10
+        title: 控制设备
+        type: http-request
+        url: '{{#env.BACKEND_BASE_URL#}}{{#control_build_request.control_url#}}'
+        variables: []
+      height: 136
+      id: control_execute
+      position:
+        x: 2180
+        y: 40
+      positionAbsolute:
+        x: 2180
+        y: 40
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+    - data:
+        context:
+          enabled: false
+        desc: 将控制结果转为用户回复
+        memory:
+          role_prefix:
+            assistant: ''
+            user: ''
+          window:
+            enabled: false
+            size: 5
+        model:
+          completion_params:
+            max_tokens: 260
+            temperature: 0.2
+            top_p: 0.9
+          mode: chat
+          name: qwen3-max
+          provider: langgenius/tongyi/tongyi
+        prompt_template:
+        - id: control-present-system
+          role: system
+          text: |
+            你是智能家居控制助手。根据设备控制执行结果，生成简洁中文回复。
+            必须说明设备名、执行动作和平台返回状态。
+            如果 confirmation=physical_pending，只能回复“控制命令已由 Home Assistant 接受，物理设备是否动作仍需现场确认”，禁止说“已打开”“已关闭”或“执行成功”。
+            如果 confirmation=confirmed，才可以说明 Home Assistant 回读已确认；如果失败，说明原因并建议检查设备映射或连接状态。
+            不要输出 JSON。
+        - id: control-present-user
+          role: user
+          text: |
+            用户原始请求：{{#sys.query#}}
+            设备名称：{{#control_build_request.device_name#}}
+            实体 ID：{{#control_build_request.entity_id#}}
+            执行操作：{{#control_build_request.action#}}
+            控制结果：{{#control_execute.body#}}
+        selected: false
+        title: 控制结果整理
+        type: llm
+        variables: []
+        vision:
+          enabled: false
+      height: 132
+      id: control_present
+      position:
+        x: 2480
+        y: 40
+      positionAbsolute:
+        x: 2480
+        y: 40
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+    - data:
+        answer: '{{#control_present.text#}}'
+        desc: 控制分支输出
+        selected: false
+        title: 控制输出
+        type: answer
+        variables:
+        - value_selector:
+          - control_present
+          - text
+          variable: text
+      height: 131
+      id: answer_control
+      position:
+        x: 2780
+        y: 40
+      positionAbsolute:
+        x: 2780
+        y: 40
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+    - data:
+        dataset_ids: []
+        desc: 知识库检索（导入后在 Dify 控制台绑定真实 dataset）
+        multiple_retrieval_config:
+          reranking_enable: false
+          reranking_mode: reranking_model
+          reranking_model:
+            model: gte-rerank
+            provider: langgenius/tongyi/tongyi
+          score_threshold: null
+          top_k: 3
+        query_attachment_selector: []
+        query_variable_selector:
+        - sys
+        - query
+        retrieval_mode: multiple
+        selected: false
+        single_retrieval_config:
+          model:
+            completion_params: {}
+            mode: chat
+            name: qwen3-max
+            provider: langgenius/tongyi/tongyi
+        title: 知识库检索
+        type: knowledge-retrieval
+      height: 134
+      id: rag_kb
+      position:
+        x: 980
+        y: 300
+      positionAbsolute:
+        x: 980
+        y: 300
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+    - data:
+        conditions:
+        - comparison_operator: not empty
+          id: rag-cond-has-context
+          value: __non_empty_placeholder__
+          varType: string
+          variable_selector:
+          - rag_kb
+          - result
+        desc: 判断是否命中知识库
+        logical_operator: and
+        selected: false
+        title: 是否命中
+        type: if-else
+      height: 154
+      id: rag_has_context
+      position:
+        x: 1280
+        y: 300
+      positionAbsolute:
+        x: 1280
+        y: 300
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+    - data:
+        context:
+          enabled: true
+          variable_selector:
+          - rag_kb
+          - result
+        desc: 命中知识库回答
+        memory:
+          role_prefix:
+            assistant: ''
+            user: ''
+          window:
+            enabled: false
+            size: 5
+        model:
+          completion_params:
+            max_tokens: 384
+            temperature: 0.2
+            top_p: 0.9
+          mode: chat
+          name: qwen3-max
+          provider: langgenius/tongyi/tongyi
+        prompt_template:
+        - id: rag-hit-system
+          role: system
+          text: |
+            你是智慧家居知识库回答节点。必须基于检索上下文回答，不要编造未命中的信息。
+            输出 JSON：
+            {"status":"success","message":"rag_hit","payload":{"answer":"...","citations":"..."},"trace_id":"..."}
+        - id: rag-hit-user
+          role: user
+          text: |
+            问题：{{#sys.query#}}
+            上下文：{{#rag_kb.result#}}
+        selected: false
+        title: 命中回答
+        type: llm
+        variables: []
+        vision:
+          enabled: false
+      height: 132
+      id: rag_hit_answer
+      position:
+        x: 1580
+        y: 220
+      positionAbsolute:
+        x: 1580
+        y: 220
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+    - data:
+        context:
+          enabled: false
+        desc: 未命中降级回答
+        memory:
+          role_prefix:
+            assistant: ''
+            user: ''
+          window:
+            enabled: false
+            size: 5
+        model:
+          completion_params:
+            max_tokens: 160
+            temperature: 0.2
+            top_p: 0.9
+          mode: chat
+          name: qwen3-max
+          provider: langgenius/tongyi/tongyi
+        prompt_template:
+        - id: rag-miss-system
+          role: system
+          text: |
+            输出JSON：
+            {"status":"success","message":"knowledge_not_found","payload":{"answer":"当前知识库未命中，请补充文档或调整问题后重试。"},"trace_id":"..."}
+        - id: rag-miss-user
+          role: user
+          text: '{{#sys.query#}}'
+        selected: false
+        title: 未命中回答
+        type: llm
+        variables: []
+        vision:
+          enabled: false
+      height: 132
+      id: rag_miss_answer
+      position:
+        x: 1580
+        y: 410
+      positionAbsolute:
+        x: 1580
+        y: 410
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+    - data:
+        context:
+          enabled: false
+        desc: 命中答案润色与引用格式化
+        memory:
+          role_prefix:
+            assistant: ''
+            user: ''
+          window:
+            enabled: false
+            size: 5
+        model:
+          completion_params:
+            max_tokens: 260
+            temperature: 0.2
+            top_p: 0.9
+          mode: chat
+          name: qwen3-max
+          provider: langgenius/tongyi/tongyi
+        prompt_template:
+        - id: rag-hit-polish-system
+          role: system
+          text: |
+            你是RAG答案编辑器。
+            将输入内容整理成专业中文输出，结构为：结论、依据、建议下一步。
+            禁止输出JSON。
+        - id: rag-hit-polish-user
+          role: user
+          text: '{{#rag_hit_answer.text#}}'
+        selected: false
+        title: 命中结果优化
+        type: llm
+        variables: []
+        vision:
+          enabled: false
+      height: 132
+      id: rag_hit_polish
+      position:
+        x: 1880
+        y: 220
+      positionAbsolute:
+        x: 1880
+        y: 220
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+    - data:
+        context:
+          enabled: false
+        desc: 未命中情况下生成补齐建议
+        memory:
+          role_prefix:
+            assistant: ''
+            user: ''
+          window:
+            enabled: false
+            size: 5
+        model:
+          completion_params:
+            max_tokens: 200
+            temperature: 0.2
+            top_p: 0.9
+          mode: chat
+          name: qwen3-max
+          provider: langgenius/tongyi/tongyi
+        prompt_template:
+        - id: rag-miss-polish-system
+          role: system
+          text: |
+            你是知识库运维助手。
+            在未命中时，输出简洁说明并附上3条可执行补库建议。
+            禁止输出JSON。
+        - id: rag-miss-polish-user
+          role: user
+          text: '{{#rag_miss_answer.text#}}'
+        selected: false
+        title: 未命中补库建议
+        type: llm
+        variables: []
+        vision:
+          enabled: false
+      height: 132
+      id: rag_miss_polish
+      position:
+        x: 1880
+        y: 410
+      positionAbsolute:
+        x: 1880
+        y: 410
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+    - data:
+        answer: '{{#rag_hit_polish.text#}}'
+        desc: RAG 命中输出
+        selected: false
+        title: RAG命中输出
+        type: answer
+        variables:
+        - value_selector:
+          - rag_hit_polish
+          - text
+          variable: text
+      height: 131
+      id: answer_rag_hit
+      position:
+        x: 2180
+        y: 220
+      positionAbsolute:
+        x: 2180
+        y: 220
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+    - data:
+        answer: '{{#rag_miss_polish.text#}}'
+        desc: RAG 未命中输出
+        selected: false
+        title: RAG未命中输出
+        type: answer
+        variables:
+        - value_selector:
+          - rag_miss_polish
+          - text
+          variable: text
+      height: 131
+      id: answer_rag_miss
+      position:
+        x: 2180
+        y: 410
+      positionAbsolute:
+        x: 2180
+        y: 410
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+    - data:
+        context:
+          enabled: false
+        desc: 提取数据查询参数
+        memory:
+          role_prefix:
+            assistant: ''
+            user: ''
+          window:
+            enabled: false
+            size: 5
+        model:
+          completion_params:
+            max_tokens: 220
+            temperature: 0.1
+            top_p: 0.9
+          mode: chat
+          name: qwen3-max
+          provider: langgenius/tongyi/tongyi
+        prompt_template:
+        - id: data-extract-system
+          role: system
+          text: |
+            输出JSON：
+            {
+              "metric":"temperature|humidity|pm25|services|device",
+              "query_type":"auto|realtime|device_history|sensor_history|services",
+              "entity_id":"",
+              "hours":24,
+              "time_range":"..."
+            }
+            如果用户查询系统服务、服务健康、平台状态，query_type 必须是 services，metric 必须是 services。
+            只输出JSON。
+        - id: data-extract-user
+          role: user
+          text: '{{#sys.query#}}'
+        selected: false
+        title: 数据参数提取
+        type: llm
+        variables: []
+        vision:
+          enabled: false
+      height: 132
+      id: data_extract
+      position:
+        x: 980
+        y: 620
+      positionAbsolute:
+        x: 980
+        y: 620
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+    - data:
+        authorization:
+          config: null
+          type: no-auth
+        body:
+          data: ''
+          type: none
+        desc: 调用平台 /monitor/agent-query，读取实时状态、历史趋势或服务健康数据
+        headers: 'X-Agent-Key:{{#env.AGENT_API_KEY#}}'
+        method: get
+        params: 'query:{{#sys.query#}}
+
+          metric:{{#data_extract.text#}}'
+        retry_config:
+          max_retries: 2
+          retry_enabled: true
+          retry_interval: 1000
+        selected: false
+        ssl_verify: false
+        timeout:
+          max_connect_timeout: 10
+          max_read_timeout: 20
+          max_write_timeout: 10
+        title: 平台数据查询
+        type: http-request
+        url: '{{#env.BACKEND_BASE_URL#}}/api/v1/monitor/agent-query'
+        variables: []
+      height: 132
+      id: data_query
+      position:
+        x: 1280
+        y: 620
+      positionAbsolute:
+        x: 1280
+        y: 620
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+    - data:
+        context:
+          enabled: false
+        desc: 评估数据完整性与来源可信度
+        memory:
+          role_prefix:
+            assistant: ''
+            user: ''
+          window:
+            enabled: false
+            size: 5
+        model:
+          completion_params:
+            max_tokens: 260
+            temperature: 0.1
+            top_p: 0.9
+          mode: chat
+          name: qwen3-max
+          provider: langgenius/tongyi/tongyi
+        prompt_template:
+        - id: data-quality-system
+          role: system
+          text: |
+            你是数据质检节点。只基于输入 JSON 输出质检 JSON：
+            {"quality_score":0,"anomaly_flags":["..."],"summary":"...","source_endpoint":"...","data_source":"...","fallback_note":"..."}
+            必须原样保留 source_endpoint、data_source、fallback_note。
+        - id: data-quality-user
+          role: user
+          text: '{{#data_query.body#}}'
+        selected: false
+        title: 数据质检
+        type: llm
+        variables: []
+        vision:
+          enabled: false
+      height: 132
+      id: data_quality
+      position:
+        x: 1580
+        y: 620
+      positionAbsolute:
+        x: 1580
+        y: 620
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+    - data:
+        context:
+          enabled: false
+        desc: 生成结构化分析报告
+        memory:
+          role_prefix:
+            assistant: ''
+            user: ''
+          window:
+            enabled: false
+            size: 5
+        model:
+          completion_params:
+            max_tokens: 520
+            temperature: 0.1
+            top_p: 0.9
+          mode: chat
+          name: qwen3-max
+          provider: langgenius/tongyi/tongyi
+        prompt_template:
+        - id: data-report-system
+          role: system
+          text: |
+            输出JSON：
+            {
+              "status":"success",
+              "message":"data_report_ready",
+              "query_type":"...",
+              "source_endpoint":"...",
+              "data_source":"...",
+              "fallback_note":"...",
+              "payload":{"report":"...","key_values":["..."],"services":["..."],"insights":["..."]},
+              "trace_id":"..."
+            }
+            规则：
+            1. 必须只基于 real_data 与 quality 输入，不得编造其它时间段、数值或趋势。
+            2. 如果 query_type=services，必须总结服务名称、运行状态和延迟，不得输出历史趋势结论。
+            3. 必须原样保留 source_endpoint、data_source、fallback_note。
+        - id: data-report-user
+          role: user
+          text: |
+            real_data={{#data_query.body#}}
+            quality={{#data_quality.text#}}
+        selected: false
+        title: 数据报告生成
+        type: llm
+        variables: []
+        vision:
+          enabled: false
+      height: 132
+      id: data_report
+      position:
+        x: 1880
+        y: 620
+      positionAbsolute:
+        x: 1880
+        y: 620
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+    - data:
+        context:
+          enabled: false
+        desc: 面向用户输出可读结果
+        memory:
+          role_prefix:
+            assistant: ''
+            user: ''
+          window:
+            enabled: false
+            size: 5
+        model:
+          completion_params:
+            max_tokens: 360
+            temperature: 0.1
+            top_p: 0.9
+          mode: chat
+          name: qwen3-max
+          provider: langgenius/tongyi/tongyi
+        prompt_template:
+        - id: data-present-system
+          role: system
+          text: |
+            你是智慧家居数据查询助手。
+            只基于输入内容输出中文摘要，必须包含：
+            1) 查询类型 query_type
+            2) 来源接口 source_endpoint
+            3) 数据源 data_source
+            4) fallback_note（为空则写“无”）
+            5) 基于 result 或 payload 的关键结论
+            如果是系统服务状态查询，必须列出服务状态；不得输出传感器趋势或无关时间段。
+            禁止输出JSON。
+        - id: data-present-user
+          role: user
+          text: |
+            用户原始问题：{{#sys.query#}}
+            平台原始响应：{{#data_query.body#}}
+            质检结果：{{#data_quality.text#}}
+            报告草稿：{{#data_report.text#}}
+        selected: false
+        title: 数据结果整理
+        type: llm
+        variables: []
+        vision:
+          enabled: false
+      height: 132
+      id: data_present
+      position:
+        x: 2180
+        y: 620
+      positionAbsolute:
+        x: 2180
+        y: 620
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+    - data:
+        answer: '{{#data_present.text#}}'
+        desc: 数据查询输出
+        selected: false
+        title: 数据输出
+        type: answer
+        variables:
+        - value_selector:
+          - data_present
+          - text
+          variable: text
+      height: 131
+      id: answer_data
+      position:
+        x: 2480
+        y: 620
+      positionAbsolute:
+        x: 2480
+        y: 620
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+    - data:
+        context:
+          enabled: false
+        desc: 兜底回答
+        memory:
+          role_prefix:
+            assistant: ''
+            user: ''
+          window:
+            enabled: true
+            size: 10
+        model:
+          completion_params:
+            max_tokens: 512
+            temperature: 0.3
+            top_p: 0.9
+          mode: chat
+          name: qwen3-max
+          provider: langgenius/tongyi/tongyi
+        prompt_template:
+        - id: general-system
+          role: system
+          text: |
+            你是智慧家居统一智能体的兜底助手。
+            简洁回答用户问题，并提示可以继续使用三类主能力：
+            - 设备控制：例如“打开筒灯”
+            - 知识问答：例如“根据知识库回答系统支持哪些核心能力”
+            - 数据查询：例如“查询当前系统服务状态”
+        - id: general-user
+          role: user
+          text: '{{#sys.query#}}'
+        selected: false
+        title: 兜底回答
+        type: llm
+        variables: []
+        vision:
+          enabled: false
+      height: 116
+      id: llm_general
+      position:
+        x: 980
+        y: 860
+      positionAbsolute:
+        x: 980
+        y: 860
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+    - data:
+        answer: '{{#llm_general.text#}}'
+        desc: 兜底输出
+        selected: false
+        title: 兜底输出
+        type: answer
+        variables:
+        - value_selector:
+          - llm_general
+          - text
+          variable: text
+      height: 131
+      id: answer_general
+      position:
+        x: 1280
+        y: 860
+      positionAbsolute:
+        x: 1280
+        y: 860
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+    viewport:
+      x: -150
+      y: -120
+      zoom: 0.62
+  rag_pipeline_variables: []

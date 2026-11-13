@@ -3,6 +3,15 @@
 # ═══════════════════════════════════════════
 
 # ── OS ──
+.env
+.playwright-cli/
+.playwright-mcp/
+output/
+docs/research/*session-context.md
+docs/research/*会话可见对话脱敏归档.md
+docs/delivery/evidence/
+*.tsbuildinfo
+
 .DS_Store
 Thumbs.db
 
@@ -10,6 +19,7 @@ Thumbs.db
 *.log
 .backend.log
 .frontend.log
+.logs/
 
 # ── Editor / IDE ──
 .vscode/
@@ -22,6 +32,7 @@ Thumbs.db
 #  Python / FastAPI Backend
 # ═══════════════════════════════════════════
 venv/
+smart-home-ai-backend/venv/
 __pycache__/
 *.py[cod]
 *.pyo
@@ -32,12 +43,16 @@ build/
 
 # 环境变量（包含密钥，绝不提交）
 smart-home-ai-backend/.env
+smart-home-ai-backend/backend.env
+deploy-kit/cloud-migration/config/migration.env
 
 # ═══════════════════════════════════════════
 #  Next.js / React Frontend
 # ═══════════════════════════════════════════
 node_modules/
+smart-home-ai-frontend/node_modules/
 .next/
+smart-home-ai-frontend/.next/
 out/
 
 # 环境变量
@@ -49,3 +64,19 @@ smart-home-ai-frontend/.env*.local
 # ═══════════════════════════════════════════
 *.sqlite3
 *.db
+
+# ── Cloud migration runtime artifacts ──
+build/migration/
+deploy-kit/**/*.env
+!deploy-kit/**/*.env.example
+*.sql
+*.sql.gz
+*.dump
+*.backup
+*.tar
+*.tar.gz
+*.tgz
+*.img
+*.docker-image
+*secrets*
+*secret*

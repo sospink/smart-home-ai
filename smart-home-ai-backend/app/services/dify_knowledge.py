@@ -9,20 +9,28 @@ Endpoints:
   GET    /v1/datasets/{id}/documents — 文档列表
   POST   /v1/datasets/{id}/document/create-by-text  — 通过文本创建文档
   POST   /v1/datasets/{id}/document/create-by-file  — 通过文件创建文档
+  POST   /v1/datasets/{id}/documents/{doc_id}/update-by-text  — 通过文本更新文档
+  POST   /v1/datasets/{id}/documents/{doc_id}/update-by-file  — 通过文件更新文档
   DELETE /v1/datasets/{id}/documents/{doc_id}       — 删除文档
 """
 import httpx
 from typing import Optional
 from app.config import settings
 
+DIFY_KNOWLEDGE_LIST_TIMEOUT_SECONDS = 4
+DIFY_KNOWLEDGE_READ_TIMEOUT_SECONDS = 6
+DIFY_KNOWLEDGE_MUTATION_TIMEOUT_SECONDS = 8
+
 
 class DifyKnowledgeService:
-    def __init__(self):
-        self.base_url = settings.DIFY_BASE_URL.rstrip("/")
-        self.api_key = settings.DIFY_DATASET_API_KEY
+    def __init__(self, base_url: Optional[str] = None, api_key: Optional[str] = None):
+        self.base_url = (base_url or settings.DIFY_BASE_URL).strip().rstrip("/")
+        self.api_key = (api_key or settings.DIFY_DATASET_API_KEY or "").strip()
 
     @property
     def _headers(self) -> dict:
+        if not self.api_key:
+            raise RuntimeError("Dify Dataset API Key 未配置")
         return {"Authorization": f"Bearer {self.api_key}"}
 
     # ── 知识库 CRUD ──
@@ -34,7 +42,7 @@ class DifyKnowledgeService:
         params = {"page": page, "limit": limit}
         if keyword:
             params["keyword"] = keyword
-        async with httpx.AsyncClient(timeout=15) as client:
+        async with httpx.AsyncClient(timeout=DIFY_KNOWLEDGE_LIST_TIMEOUT_SECONDS, trust_env=False) as client:
             r = await client.get(
                 f"{self.base_url}/v1/datasets",
                 headers=self._headers,
@@ -43,9 +51,19 @@ class DifyKnowledgeService:
             r.raise_for_status()
             return r.json()
 
+    async def get_dataset(self, dataset_id: str) -> dict:
+        """GET /v1/datasets/{id} — 单个知识库详情。"""
+        async with httpx.AsyncClient(timeout=DIFY_KNOWLEDGE_READ_TIMEOUT_SECONDS, trust_env=False) as client:
+            r = await client.get(
+                f"{self.base_url}/v1/datasets/{dataset_id}",
+                headers=self._headers,
+            )
+            r.raise_for_status()
+            return r.json()
+
     async def create_dataset(self, name: str, description: str = "") -> dict:
         """POST /v1/datasets — 创建空知识库"""
-        async with httpx.AsyncClient(timeout=15) as client:
+        async with httpx.AsyncClient(timeout=DIFY_KNOWLEDGE_MUTATION_TIMEOUT_SECONDS, trust_env=False) as client:
             r = await client.post(
                 f"{self.base_url}/v1/datasets",
                 headers=self._headers,
@@ -61,7 +79,7 @@ class DifyKnowledgeService:
 
     async def delete_dataset(self, dataset_id: str) -> None:
         """DELETE /v1/datasets/{id} — 删除知识库"""
-        async with httpx.AsyncClient(timeout=15) as client:
+        async with httpx.AsyncClient(timeout=DIFY_KNOWLEDGE_MUTATION_TIMEOUT_SECONDS, trust_env=False) as client:
             r = await client.delete(
                 f"{self.base_url}/v1/datasets/{dataset_id}",
                 headers=self._headers,
@@ -77,7 +95,7 @@ class DifyKnowledgeService:
         params: dict = {"page": page, "limit": limit}
         if keyword:
             params["keyword"] = keyword
-        async with httpx.AsyncClient(timeout=15) as client:
+        async with httpx.AsyncClient(timeout=DIFY_KNOWLEDGE_READ_TIMEOUT_SECONDS, trust_env=False) as client:
             r = await client.get(
                 f"{self.base_url}/v1/datasets/{dataset_id}/documents",
                 headers=self._headers,
@@ -94,7 +112,7 @@ class DifyKnowledgeService:
         indexing_technique: str = "economy",
     ) -> dict:
         """POST /v1/datasets/{id}/document/create-by-text"""
-        async with httpx.AsyncClient(timeout=30) as client:
+        async with httpx.AsyncClient(timeout=30, trust_env=False) as client:
             r = await client.post(
                 f"{self.base_url}/v1/datasets/{dataset_id}/document/create-by-text",
                 headers=self._headers,
@@ -117,7 +135,7 @@ class DifyKnowledgeService:
         """POST /v1/datasets/{id}/document/create-by-file"""
         import json
 
-        async with httpx.AsyncClient(timeout=60) as client:
+        async with httpx.AsyncClient(timeout=60, trust_env=False) as client:
             r = await client.post(
                 f"{self.base_url}/v1/datasets/{dataset_id}/document/create-by-file",
                 headers=self._headers,
@@ -134,18 +152,74 @@ class DifyKnowledgeService:
 
     async def delete_document(self, dataset_id: str, document_id: str) -> None:
         """DELETE /v1/datasets/{id}/documents/{doc_id}"""
-        async with httpx.AsyncClient(timeout=15) as client:
+        async with httpx.AsyncClient(timeout=15, trust_env=False) as client:
             r = await client.delete(
                 f"{self.base_url}/v1/datasets/{dataset_id}/documents/{document_id}",
                 headers=self._headers,
             )
             r.raise_for_status()
 
+    async def update_document_by_text(
+        self,
+        dataset_id: str,
+        document_id: str,
+        name: str,
+        text: str,
+        indexing_technique: str = "economy",
+    ) -> dict:
+        """POST /v1/datasets/{id}/documents/{doc_id}/update-by-text"""
+        payload = {
+            "name": name,
+            "text": text,
+            "indexing_technique": indexing_technique,
+            "process_rule": {"mode": "automatic"},
+        }
+        async with httpx.AsyncClient(timeout=30, trust_env=False) as client:
+            r = await client.post(
+                f"{self.base_url}/v1/datasets/{dataset_id}/documents/{document_id}/update-by-text",
+                headers=self._headers,
+                json=payload,
+            )
+            if r.status_code == 404:
+                # Some Dify builds still expose update_by_text.
+                r = await client.post(
+                    f"{self.base_url}/v1/datasets/{dataset_id}/documents/{document_id}/update_by_text",
+                    headers=self._headers,
+                    json=payload,
+                )
+            r.raise_for_status()
+            return r.json()
+
+    async def update_document_by_file(
+        self,
+        dataset_id: str,
+        document_id: str,
+        file_content: bytes,
+        file_name: str,
+    ) -> dict:
+        """POST /v1/datasets/{id}/documents/{doc_id}/update-by-file"""
+        import json
+
+        data = {
+            "name": file_name,
+            "indexing_technique": "economy",
+            "process_rule": {"mode": "automatic"},
+        }
+        async with httpx.AsyncClient(timeout=60, trust_env=False) as client:
+            r = await client.post(
+                f"{self.base_url}/v1/datasets/{dataset_id}/documents/{document_id}/update-by-file",
+                headers=self._headers,
+                files={"file": (file_name, file_content)},
+                data={"data": json.dumps(data)},
+            )
+            r.raise_for_status()
+            return r.json()
+
     # ── 语义检索测试 ──
 
     async def hit_testing(self, dataset_id: str, query: str) -> dict:
         """POST /v1/datasets/{id}/hit-testing — 召回测试"""
-        async with httpx.AsyncClient(timeout=20) as client:
+        async with httpx.AsyncClient(timeout=20, trust_env=False) as client:
             r = await client.post(
                 f"{self.base_url}/v1/datasets/{dataset_id}/hit-testing",
                 headers=self._headers,
